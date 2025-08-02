@@ -276,69 +276,239 @@ HTML_TEMPLATE = """
         }
         
         .chat-area {
-            background: #f8fafc;
-            border-radius: 15px;
+            background: linear-gradient(145deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
             padding: 25px;
-            height: 400px;
+            height: 500px;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chat-area::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%), 
+                        linear-gradient(-45deg, rgba(255,255,255,0.1) 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.1) 75%), 
+                        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.1) 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            pointer-events: none;
+            opacity: 0.1;
+        }
+        
+        .chat-header {
+            color: white;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .chat-header h3 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .ai-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .ai-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
         
         .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 10px;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.95);
             margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            z-index: 2;
         }
         
         .message {
-            margin-bottom: 15px;
-            padding: 12px 16px;
-            border-radius: 18px;
-            max-width: 80%;
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            border-radius: 20px;
+            max-width: 85%;
+            position: relative;
+            animation: messageSlide 0.5s ease;
+        }
+        
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .user-message {
-            background: #ff6b6b;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
             color: white;
             margin-left: auto;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+        
+        .user-message::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            right: 15px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #ee5a52;
         }
         
         .ai-message {
-            background: #e5e7eb;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
             color: #374151;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        
+        .ai-message::before {
+            content: '🤖 NY AI';
+            position: absolute;
+            top: -8px;
+            left: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        
+        .ai-message::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 15px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #e2e8f0;
         }
         
         .chat-input-area {
             display: flex;
-            gap: 10px;
+            gap: 15px;
+            position: relative;
+            z-index: 2;
         }
         
         .chat-input {
             flex: 1;
-            padding: 12px;
-            border: 2px solid #e5e7eb;
+            padding: 15px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 25px;
             outline: none;
-        }
-        
-        .send-btn {
-            background: #ff6b6b;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 45px;
-            height: 45px;
-            cursor: pointer;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            font-size: 16px;
             transition: all 0.3s ease;
         }
         
+        .chat-input:focus {
+            border-color: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+        
+        .send-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+        
         .send-btn:hover {
-            background: #ee5a52;
-            transform: scale(1.1);
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+        
+        .send-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .typing-indicator {
+            display: none;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            margin-bottom: 15px;
+            max-width: 85%;
+        }
+        
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes typing {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
         
         .features {
@@ -461,33 +631,7 @@ HTML_TEMPLATE = """
             <p>Next-Gen AI with OCR, MathJax Rendering & Sequential Solutions</p>
         </div>
         
-        <div class="features">
-            <div class="feature-card">
-                <div class="feature-icon">📸</div>
-                <h3>Image Analysis</h3>
-                <p>Advanced OCR with formula recognition</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🔗</div>
-                <h3>URL Support</h3>
-                <p>Direct image URL processing</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">📊</div>
-                <h3>Sequential Solutions</h3>
-                <p>Step-by-step organized approach</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🔬</div>
-                <h3>MathJax Rendering</h3>
-                <p>Beautiful mathematical expressions</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">💬</div>
-                <h3>Interactive Chat</h3>
-                <p>Ask follow-up questions</p>
-            </div>
-        </div>
+
         
         <div class="main-content">
             <div class="left-panel">
@@ -581,18 +725,36 @@ HTML_TEMPLATE = """
                 </div>
                 
                 <div class="chat-area">
-                    <h3>💬 Chat with NY AI</h3>
+                    <div class="chat-header">
+                        <h3>🤖 Chat with NY AI</h3>
+                        <div class="ai-status">
+                            <div class="ai-indicator"></div>
+                            <span>NY AI is online and ready to help</span>
+                        </div>
+                    </div>
+                    
                     <div class="chat-messages" id="chatMessages">
                         {% for message in chat_history %}
                         <div class="message {{ 'user-message' if message.role == 'user' else 'ai-message' }}">
                             {{ message.content|safe }}
                         </div>
                         {% endfor %}
+                        
+                        <div class="typing-indicator" id="typingIndicator">
+                            <div class="typing-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                            <span style="margin-left: 10px; color: #667eea; font-size: 0.9rem;">NY AI is thinking...</span>
+                        </div>
                     </div>
                     
                     <div class="chat-input-area">
-                        <input type="text" class="chat-input" id="chatInput" placeholder="Ask follow-up questions to NY AI..." onkeypress="handleChatKeyPress(event)">
-                        <button class="send-btn" onclick="sendChatMessage()">➤</button>
+                        <input type="text" class="chat-input" id="chatInput" placeholder="Ask NY AI anything about this problem..." onkeypress="handleChatKeyPress(event)">
+                        <button class="send-btn" onclick="sendChatMessage()">
+                            <span>➤</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -702,6 +864,9 @@ HTML_TEMPLATE = """
             addMessageToChat(message, 'user');
             input.value = '';
             
+            // Show typing indicator
+            showTypingIndicator();
+            
             // Send to server
             fetch('/chat', {
                 method: 'POST',
@@ -714,15 +879,33 @@ HTML_TEMPLATE = """
             })
             .then(response => response.json())
             .then(data => {
+                // Hide typing indicator
+                hideTypingIndicator();
+                
                 if (data.response) {
-                    addMessageToChat(data.response, 'ai');
+                    // Add AI response with delay for more natural feel
+                    setTimeout(() => {
+                        addMessageToChat(data.response, 'ai');
+                    }, 500);
                 } else if (data.error) {
-                    addMessageToChat('Error: ' + data.error, 'ai');
+                    addMessageToChat('❌ Error: ' + data.error, 'ai');
                 }
             })
             .catch(error => {
-                addMessageToChat('Error: ' + error.message, 'ai');
+                hideTypingIndicator();
+                addMessageToChat('❌ Network Error: ' + error.message, 'ai');
             });
+        }
+        
+        function showTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.style.display = 'block';
+            scrollChatToBottom();
+        }
+        
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.style.display = 'none';
         }
         
         function addMessageToChat(message, role) {
@@ -731,12 +914,18 @@ HTML_TEMPLATE = """
             messageDiv.className = `message ${role}-message`;
             messageDiv.innerHTML = message;
             chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            scrollChatToBottom();
             
             // Re-render MathJax for new messages
             if (window.MathJax) {
                 MathJax.typesetPromise([messageDiv]);
             }
+        }
+        
+        function scrollChatToBottom() {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
         
         // Initialize MathJax rendering on page load
@@ -835,45 +1024,58 @@ def call_gemini_vision(prompt, image_data=None, image_url=None):
 def create_sequential_prompt(question_text=None, has_image=False):
     """Create an enhanced prompt for sequential JEE question analysis."""
     
-    base_prompt = """You are NY AI, an expert JEE (Joint Entrance Examination) tutor with deep knowledge in Physics, Chemistry, and Mathematics. 
+    base_prompt = """You are NY AI, an advanced AI tutor specializing in JEE (Joint Entrance Examination) with expertise in Physics, Chemistry, and Mathematics. 
 
-TASK: Analyze and solve the provided JEE question with a structured, sequential approach.
+TASK: Analyze and solve the provided JEE question with a highly structured, educational approach.
 
-IMPORTANT: Format all mathematical expressions using LaTeX notation for MathJax rendering. Use $ for inline math and $$ for display math.
+CRITICAL FORMATTING REQUIREMENTS:
+- Use LaTeX notation for ALL mathematical expressions
+- Inline math: $expression$ 
+- Display math: $$expression$$
+- Always format equations, formulas, and calculations properly
 
-RESPONSE FORMAT - Provide exactly 6 structured sections:
+RESPONSE STRUCTURE - Provide exactly 6 sections:
 
-**SECTION 1: QUESTION ANALYSIS**
-- Subject area and topic identification
-- Difficulty level assessment
-- Key concepts overview
+**SECTION 1: QUESTION ANALYSIS & CLASSIFICATION**
+- Subject: [Physics/Chemistry/Mathematics]
+- Topic: [Specific topic area]
+- Difficulty: [Easy/Medium/Hard/Very Hard]
+- Concept Type: [Conceptual/Numerical/Mixed]
 
-**SECTION 2: TEXT & CONTENT EXTRACTION**
-- Extract all text, equations, and visual elements
-- Describe any diagrams or graphs
-- List multiple choice options if present
+**SECTION 2: CONTENT EXTRACTION & INTERPRETATION**
+- Extract all text and numerical data
+- Describe diagrams, graphs, or visual elements
+- Identify given values and required answers
+- Format all mathematical content with LaTeX
 
-**SECTION 3: CONCEPT IDENTIFICATION**
-- List relevant formulas (use LaTeX: $F = ma$, $E = mc^2$, etc.)
-- Identify key principles and laws
-- Required mathematical tools
+**SECTION 3: FUNDAMENTAL CONCEPTS & FORMULAS**
+- List key principles and laws
+- Present relevant formulas using LaTeX: $F = ma$, $PV = nRT$, etc.
+- Explain concept connections
+- Identify required mathematical tools
 
-**SECTION 4: SOLUTION STRATEGY**
-- Outline the solution approach
-- Identify the sequence of steps needed
-- Choose the most efficient method
+**SECTION 4: SOLUTION METHODOLOGY**
+- Outline strategic approach
+- Break down into logical steps
+- Identify potential challenges
+- Choose optimal solution path
 
-**SECTION 5: DETAILED CALCULATION**
-- Step-by-step mathematical solution
-- Show all work with proper LaTeX formatting
-- Include intermediate results and explanations
+**SECTION 5: STEP-BY-STEP CALCULATION**
+- Show detailed mathematical work
+- Use proper LaTeX formatting: $$\frac{d}{dx}[f(x)] = f'(x)$$
+- Explain each calculation step
+- Include intermediate results
 
-**SECTION 6: FINAL ANSWER & VERIFICATION**
-- Clear final answer with units
-- Verification of the result
-- Common mistakes to avoid
+**SECTION 6: FINAL ANSWER & VALIDATION**
+- Present final answer clearly with units
+- Verify result reasonableness
+- Cross-check calculations
+- Highlight key insights
 
-Each section should be clearly separated and use proper LaTeX formatting for all mathematical expressions."""
+FORMAT EXAMPLE for math:
+- Inline: The force $F = ma$ where $m = 5\text{ kg}$
+- Display: $$E = \frac{1}{2}mv^2 + mgh$$
+- Complex: $$\int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$$
     
     if question_text:
         base_prompt += f"\n\nQUESTION TEXT:\n{question_text}"

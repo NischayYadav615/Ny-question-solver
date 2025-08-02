@@ -22,7 +22,26 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced JEE Question Solver - Gemini 2.0 Flash</title>
+    <title>NY AI - Advanced JEE Question Solver</title>
+    
+    <!-- MathJax Configuration -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process'
+            }
+        };
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+    
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
@@ -31,26 +50,49 @@ HTML_TEMPLATE = """
             min-height: 100vh;
             padding: 20px;
         }
-        .container { 
-            max-width: 1200px; 
-            margin: 0 auto; 
-            background: white; 
-            border-radius: 20px; 
+        
+        .main-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
         }
+        
         .header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffd93d 50%, #6bcf7f 100%);
             color: white;
             padding: 30px;
             text-align: center;
+            position: relative;
         }
-        .header h1 { font-size: 2.5rem; margin-bottom: 10px; }
-        .header p { font-size: 1.1rem; opacity: 0.9; }
         
-        .main-content { display: flex; gap: 20px; padding: 30px; }
-        .left-panel { flex: 1; }
-        .right-panel { flex: 1; }
+        .ny-ai-logo {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 { 
+            font-size: 2.5rem; 
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header p { 
+            font-size: 1.1rem; 
+            opacity: 0.9; 
+        }
+        
+        .main-content { 
+            display: flex; 
+            gap: 20px; 
+            padding: 30px;
+            min-height: calc(100vh - 200px);
+        }
+        .left-panel { flex: 1; max-width: 500px; }
+        .right-panel { flex: 2; }
         
         .input-section {
             background: #f8fafc;
@@ -60,7 +102,7 @@ HTML_TEMPLATE = """
             border: 2px dashed #e2e8f0;
             transition: all 0.3s ease;
         }
-        .input-section:hover { border-color: #4f46e5; }
+        .input-section:hover { border-color: #ff6b6b; }
         
         .tab-buttons {
             display: flex;
@@ -78,7 +120,7 @@ HTML_TEMPLATE = """
             font-weight: 600;
         }
         .tab-btn.active {
-            background: #4f46e5;
+            background: #ff6b6b;
             color: white;
         }
         
@@ -95,16 +137,16 @@ HTML_TEMPLATE = """
             background: #f1f5f9;
         }
         .file-upload:hover {
-            border-color: #4f46e5;
-            background: #f0f7ff;
+            border-color: #ff6b6b;
+            background: #fff5f5;
         }
         .file-upload.drag-over {
-            border-color: #4f46e5;
-            background: #eff6ff;
+            border-color: #ff6b6b;
+            background: #fff1f1;
             transform: scale(1.02);
         }
         
-        input[type="url"], input[type="text"], textarea {
+        input[type="url"] {
             width: 100%;
             padding: 15px;
             border: 2px solid #e2e8f0;
@@ -112,13 +154,13 @@ HTML_TEMPLATE = """
             font-size: 16px;
             transition: border-color 0.3s ease;
         }
-        input[type="url"]:focus, input[type="text"]:focus, textarea:focus {
+        input[type="url"]:focus {
             outline: none;
-            border-color: #4f46e5;
+            border-color: #ff6b6b;
         }
         
         .solve-btn {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
             color: white;
             padding: 18px 40px;
             border: none;
@@ -132,7 +174,7 @@ HTML_TEMPLATE = """
         }
         .solve-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 10px 25px rgba(255, 107, 107, 0.3);
         }
         .solve-btn:disabled {
             background: #9ca3af;
@@ -152,12 +194,85 @@ HTML_TEMPLATE = """
             border-radius: 15px;
             padding: 25px;
             margin-bottom: 20px;
-            min-height: 200px;
+            min-height: 300px;
         }
         
-        .solution-content {
+        .solution-sequence {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .solution-step {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 4px solid #ff6b6b;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: slideIn 0.6s ease forwards;
+        }
+        
+        .solution-step:nth-child(1) { animation-delay: 0.1s; }
+        .solution-step:nth-child(2) { animation-delay: 0.2s; }
+        .solution-step:nth-child(3) { animation-delay: 0.3s; }
+        .solution-step:nth-child(4) { animation-delay: 0.4s; }
+        .solution-step:nth-child(5) { animation-delay: 0.5s; }
+        .solution-step:nth-child(6) { animation-delay: 0.6s; }
+        
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .step-number {
+            background: #ff6b6b;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .step-content {
             line-height: 1.8;
             color: #374151;
+        }
+        
+        .math-expression {
+            background: #f1f5f9;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            border-left: 3px solid #ffd93d;
+        }
+        
+        .final-answer {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 20px;
         }
         
         .chat-area {
@@ -187,7 +302,7 @@ HTML_TEMPLATE = """
         }
         
         .user-message {
-            background: #4f46e5;
+            background: #ff6b6b;
             color: white;
             margin-left: auto;
         }
@@ -211,7 +326,7 @@ HTML_TEMPLATE = """
         }
         
         .send-btn {
-            background: #4f46e5;
+            background: #ff6b6b;
             color: white;
             border: none;
             border-radius: 50%;
@@ -222,13 +337,13 @@ HTML_TEMPLATE = """
         }
         
         .send-btn:hover {
-            background: #3730a3;
+            background: #ee5a52;
             transform: scale(1.1);
         }
         
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             padding: 30px;
             background: #f1f5f9;
@@ -241,6 +356,7 @@ HTML_TEMPLATE = """
             text-align: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             transition: transform 0.3s ease;
+            border-top: 4px solid #ff6b6b;
         }
         
         .feature-card:hover {
@@ -260,7 +376,7 @@ HTML_TEMPLATE = """
         
         .spinner {
             border: 4px solid #f3f4f6;
-            border-top: 4px solid #4f46e5;
+            border-top: 4px solid #ff6b6b;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -289,6 +405,40 @@ HTML_TEMPLATE = """
             margin: 10px 0;
         }
         
+        .ny-ai-badge {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        
+        .sequence-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .sequence-btn {
+            padding: 8px 16px;
+            border: 2px solid #ff6b6b;
+            background: white;
+            color: #ff6b6b;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+        
+        .sequence-btn.active, .sequence-btn:hover {
+            background: #ff6b6b;
+            color: white;
+        }
+        
         @media (max-width: 768px) {
             .main-content {
                 flex-direction: column;
@@ -296,36 +446,46 @@ HTML_TEMPLATE = """
             .header h1 {
                 font-size: 2rem;
             }
+            .ny-ai-logo {
+                font-size: 2rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="main-wrapper">
         <div class="header">
-            <h1>🧠 Advanced JEE Question Solver</h1>
-            <p>Powered by Gemini 2.0 Flash with OCR, Text Extraction & Chat Support</p>
+            <div class="ny-ai-badge">Powered by NY AI</div>
+            <div class="ny-ai-logo">🧠 NY AI</div>
+            <h1>Advanced JEE Question Solver</h1>
+            <p>Next-Gen AI with OCR, MathJax Rendering & Sequential Solutions</p>
         </div>
         
         <div class="features">
             <div class="feature-card">
                 <div class="feature-icon">📸</div>
                 <h3>Image Analysis</h3>
-                <p>Advanced OCR and image understanding</p>
+                <p>Advanced OCR with formula recognition</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">📝</div>
-                <h3>Text Extraction</h3>
-                <p>Extract and analyze text from images</p>
+                <div class="feature-icon">🔗</div>
+                <h3>URL Support</h3>
+                <p>Direct image URL processing</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Sequential Solutions</h3>
+                <p>Step-by-step organized approach</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔬</div>
+                <h3>MathJax Rendering</h3>
+                <p>Beautiful mathematical expressions</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">💬</div>
-                <h3>Chat Support</h3>
-                <p>Interactive chat for follow-up questions</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🎯</div>
-                <h3>Step-by-Step</h3>
-                <p>Detailed solutions with explanations</p>
+                <h3>Interactive Chat</h3>
+                <p>Ask follow-up questions</p>
             </div>
         </div>
         
@@ -337,7 +497,6 @@ HTML_TEMPLATE = """
                     <div class="tab-buttons">
                         <button class="tab-btn active" onclick="switchTab('image')">📷 Image</button>
                         <button class="tab-btn" onclick="switchTab('url')">🔗 URL</button>
-                        <button class="tab-btn" onclick="switchTab('text')">📝 Text</button>
                     </div>
                     
                     <form method="POST" enctype="multipart/form-data" id="questionForm">
@@ -353,12 +512,8 @@ HTML_TEMPLATE = """
                             <input type="url" name="image_url" placeholder="🔗 Paste image URL here..." value="{{ image_url or '' }}">
                         </div>
                         
-                        <div id="text-tab" class="tab-content">
-                            <textarea name="question_text" rows="8" placeholder="📝 Type or paste your JEE question here...">{{ question_text or '' }}</textarea>
-                        </div>
-                        
                         <button type="submit" class="solve-btn" id="solveBtn">
-                            🧠 Analyze & Solve Question
+                            🧠 Analyze & Solve with NY AI
                         </button>
                     </form>
                 </div>
@@ -373,7 +528,7 @@ HTML_TEMPLATE = """
                 {% if extracted_text %}
                 <div class="input-section">
                     <h3>📄 Extracted Text</h3>
-                    <div style="background: white; padding: 15px; border-radius: 10px; border-left: 4px solid #4f46e5;">
+                    <div style="background: white; padding: 15px; border-radius: 10px; border-left: 4px solid #ff6b6b;">
                         <pre style="white-space: pre-wrap; font-family: inherit;">{{ extracted_text }}</pre>
                     </div>
                 </div>
@@ -382,21 +537,42 @@ HTML_TEMPLATE = """
             
             <div class="right-panel">
                 <div class="solution-area">
-                    <h3>✅ Solution</h3>
-                    <div class="loading" id="loading">
-                        <div class="spinner"></div>
-                        <p>Analyzing question with Gemini...</p>
+                    <h3>✅ Sequential Solution by NY AI</h3>
+                    
+                    {% if solution_sequence %}
+                    <div class="sequence-nav">
+                        {% for i in range(solution_sequence|length) %}
+                        <button class="sequence-btn {% if i == 0 %}active{% endif %}" onclick="showStep({{ i }})">
+                            Step {{ i + 1 }}
+                        </button>
+                        {% endfor %}
                     </div>
                     
-                    {% if solution %}
-                    <div class="solution-content">
-                        <pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.6;">{{ solution }}</pre>
+                    <div class="solution-sequence">
+                        {% for step in solution_sequence %}
+                        <div class="solution-step" id="step-{{ loop.index0 }}" {% if loop.index0 != 0 %}style="display: none;"{% endif %}>
+                            <div class="step-header">
+                                <div class="step-number">{{ loop.index }}</div>
+                                <div>{{ step.title }}</div>
+                            </div>
+                            <div class="step-content">
+                                {{ step.content|safe }}
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                     {% else %}
-                    <div style="text-align: center; color: #9ca3af; padding: 40px;">
-                        <div style="font-size: 3rem; margin-bottom: 15px;">🤔</div>
-                        <p>Upload an image, provide a URL, or type a question to get started!</p>
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p>NY AI is analyzing your question...</p>
                     </div>
+                    
+                    {% if not solution %}
+                    <div style="text-align: center; color: #9ca3af; padding: 40px;">
+                        <div style="font-size: 3rem; margin-bottom: 15px;">🤖</div>
+                        <p>Upload an image or provide a URL to get started with NY AI!</p>
+                    </div>
+                    {% endif %}
                     {% endif %}
                     
                     {% if error %}
@@ -405,17 +581,17 @@ HTML_TEMPLATE = """
                 </div>
                 
                 <div class="chat-area">
-                    <h3>💬 Chat with Gemini</h3>
+                    <h3>💬 Chat with NY AI</h3>
                     <div class="chat-messages" id="chatMessages">
                         {% for message in chat_history %}
                         <div class="message {{ 'user-message' if message.role == 'user' else 'ai-message' }}">
-                            {{ message.content }}
+                            {{ message.content|safe }}
                         </div>
                         {% endfor %}
                     </div>
                     
                     <div class="chat-input-area">
-                        <input type="text" class="chat-input" id="chatInput" placeholder="Ask follow-up questions..." onkeypress="handleChatKeyPress(event)">
+                        <input type="text" class="chat-input" id="chatInput" placeholder="Ask follow-up questions to NY AI..." onkeypress="handleChatKeyPress(event)">
                         <button class="send-btn" onclick="sendChatMessage()">➤</button>
                     </div>
                 </div>
@@ -438,6 +614,27 @@ HTML_TEMPLATE = """
             // Show selected tab
             document.getElementById(tabName + '-tab').classList.add('active');
             event.target.classList.add('active');
+        }
+        
+        function showStep(stepIndex) {
+            // Hide all steps
+            document.querySelectorAll('.solution-step').forEach(step => {
+                step.style.display = 'none';
+            });
+            
+            // Remove active from all sequence buttons
+            document.querySelectorAll('.sequence-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected step
+            document.getElementById('step-' + stepIndex).style.display = 'block';
+            event.target.classList.add('active');
+            
+            // Re-render MathJax for the visible step
+            if (window.MathJax) {
+                MathJax.typesetPromise([document.getElementById('step-' + stepIndex)]);
+            }
         }
         
         function previewImage(input) {
@@ -485,7 +682,7 @@ HTML_TEMPLATE = """
         document.getElementById('questionForm').addEventListener('submit', function() {
             document.getElementById('loading').style.display = 'block';
             document.getElementById('solveBtn').disabled = true;
-            document.getElementById('solveBtn').textContent = 'Analyzing...';
+            document.getElementById('solveBtn').textContent = 'NY AI Analyzing...';
         });
         
         // Chat functionality
@@ -532,10 +729,22 @@ HTML_TEMPLATE = """
             const chatMessages = document.getElementById('chatMessages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}-message`;
-            messageDiv.textContent = message;
+            messageDiv.innerHTML = message;
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Re-render MathJax for new messages
+            if (window.MathJax) {
+                MathJax.typesetPromise([messageDiv]);
+            }
         }
+        
+        // Initialize MathJax rendering on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.MathJax) {
+                MathJax.typesetPromise();
+            }
+        });
     </script>
 </body>
 </html>
@@ -623,52 +832,111 @@ def call_gemini_vision(prompt, image_data=None, image_url=None):
     except Exception as e:
         return f"Unexpected error: {str(e)}"
 
-def create_enhanced_prompt(question_text=None, has_image=False):
-    """Create an enhanced prompt for better JEE question analysis."""
+def create_sequential_prompt(question_text=None, has_image=False):
+    """Create an enhanced prompt for sequential JEE question analysis."""
     
-    base_prompt = """You are an expert JEE (Joint Entrance Examination) tutor with deep knowledge in Physics, Chemistry, and Mathematics. 
+    base_prompt = """You are NY AI, an expert JEE (Joint Entrance Examination) tutor with deep knowledge in Physics, Chemistry, and Mathematics. 
 
-TASK: Analyze and solve the provided JEE question with exceptional detail and accuracy.
+TASK: Analyze and solve the provided JEE question with a structured, sequential approach.
 
-INSTRUCTIONS:
-1. **Question Analysis**: First, identify the subject area, topic, and difficulty level
-2. **Text Extraction**: If there's an image, extract ALL text, mathematical expressions, and diagrams
-3. **Concept Identification**: Identify the key concepts and formulas needed
-4. **Step-by-Step Solution**: Provide a detailed, methodical solution
-5. **Final Answer**: Clearly state the final answer with units if applicable
-6. **Alternative Methods**: If applicable, mention alternative solution approaches
-7. **Common Mistakes**: Point out common errors students make in similar problems
+IMPORTANT: Format all mathematical expressions using LaTeX notation for MathJax rendering. Use $ for inline math and $$ for display math.
 
-FORMAT YOUR RESPONSE AS:
-📋 **QUESTION ANALYSIS**
-[Subject area, topic, difficulty level]
+RESPONSE FORMAT - Provide exactly 6 structured sections:
 
-📄 **EXTRACTED CONTENT** (if image provided)
-[All text, equations, and diagram descriptions]
+**SECTION 1: QUESTION ANALYSIS**
+- Subject area and topic identification
+- Difficulty level assessment
+- Key concepts overview
 
-🔑 **KEY CONCEPTS**
-[Relevant formulas, principles, and concepts]
+**SECTION 2: TEXT & CONTENT EXTRACTION**
+- Extract all text, equations, and visual elements
+- Describe any diagrams or graphs
+- List multiple choice options if present
 
-📝 **DETAILED SOLUTION**
-[Step-by-step solution with explanations]
+**SECTION 3: CONCEPT IDENTIFICATION**
+- List relevant formulas (use LaTeX: $F = ma$, $E = mc^2$, etc.)
+- Identify key principles and laws
+- Required mathematical tools
 
-✅ **FINAL ANSWER**
-[Clear final answer with units]
+**SECTION 4: SOLUTION STRATEGY**
+- Outline the solution approach
+- Identify the sequence of steps needed
+- Choose the most efficient method
 
-⚠️ **COMMON MISTAKES TO AVOID**
-[Typical errors students make]
+**SECTION 5: DETAILED CALCULATION**
+- Step-by-step mathematical solution
+- Show all work with proper LaTeX formatting
+- Include intermediate results and explanations
 
-💡 **ALTERNATIVE APPROACHES** (if applicable)
-[Other methods to solve the problem]
-"""
+**SECTION 6: FINAL ANSWER & VERIFICATION**
+- Clear final answer with units
+- Verification of the result
+- Common mistakes to avoid
+
+Each section should be clearly separated and use proper LaTeX formatting for all mathematical expressions."""
     
     if question_text:
         base_prompt += f"\n\nQUESTION TEXT:\n{question_text}"
     
     if has_image:
-        base_prompt += "\n\nIMAGE: Please analyze the provided image carefully for any additional visual information, diagrams, graphs, or mathematical expressions that may not be captured in the text."
+        base_prompt += "\n\nIMAGE: Please analyze the provided image carefully for any additional visual information, diagrams, graphs, or mathematical expressions."
     
     return base_prompt
+
+def parse_solution_into_sequence(solution_text):
+    """Parse the solution into sequential steps for better display."""
+    if not solution_text:
+        return []
+    
+    # Split by sections
+    sections = []
+    current_section = ""
+    current_title = ""
+    
+    lines = solution_text.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        
+        # Check if line is a section header
+        if line.startswith('**SECTION') and line.endswith('**'):
+            # Save previous section
+            if current_title and current_section:
+                sections.append({
+                    'title': current_title,
+                    'content': current_section.strip()
+                })
+            
+            # Start new section
+            current_title = line.replace('**SECTION', '').replace('**', '').strip()
+            if ':' in current_title:
+                current_title = current_title.split(':', 1)[1].strip()
+            current_section = ""
+        
+        elif line.startswith('**') and line.endswith('**') and current_section:
+            # Sub-header within section
+            current_section += f"<h4 style='color: #ff6b6b; margin: 15px 0 10px 0;'>{line.replace('**', '')}</h4>\n"
+        
+        else:
+            # Regular content
+            if line:
+                current_section += line + "\n"
+    
+    # Add the last section
+    if current_title and current_section:
+        sections.append({
+            'title': current_title,
+            'content': current_section.strip()
+        })
+    
+    # If no sections found, create a single section
+    if not sections and solution_text:
+        sections.append({
+            'title': 'Complete Solution',
+            'content': solution_text
+        })
+    
+    return sections
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -677,16 +945,14 @@ def home():
         session['chat_history'] = []
     
     image_url = None
-    solution = None
+    solution_sequence = None
     error = None
     extracted_text = None
-    question_text = None
     
     if request.method == 'POST':
         try:
             # Get inputs
             image_url = request.form.get('image_url', '').strip()
-            question_text = request.form.get('question_text', '').strip()
             
             image_data = None
             has_image = False
@@ -726,38 +992,35 @@ def home():
                     has_image = True
             
             # Validate input
-            if not question_text and not has_image:
-                error = "Please provide either an image or text question."
+            if not has_image:
+                error = "Please provide an image (upload or URL)."
             
             elif not error:
-                # Create enhanced prompt
-                prompt = create_enhanced_prompt(question_text, has_image)
+                # Create enhanced prompt for sequential solution
+                prompt = create_sequential_prompt(None, has_image)
                 
                 # Call Gemini API
-                if has_image:
-                    solution = call_gemini_vision(prompt, image_data, image_url)
-                else:
-                    # Text-only question
-                    solution = call_gemini_vision(prompt)
+                solution = call_gemini_vision(prompt, image_data, image_url)
                 
-                # Extract text if image was provided (for display purposes)
-                if has_image and not error:
-                    extract_prompt = """Please extract ALL text content from this image, including:
-                    - Question text
-                    - Mathematical equations and expressions
-                    - Numbers, measurements, and units
-                    - Any labels or annotations
-                    - Multiple choice options if present
-                    
-                    Format the extracted text clearly and preserve the original structure."""
-                    
-                    extracted_text = call_gemini_vision(extract_prompt, image_data, image_url)
+                # Parse solution into sequence
+                solution_sequence = parse_solution_into_sequence(solution)
+                
+                # Extract text for display purposes
+                extract_prompt = """Please extract ALL text content from this image, including:
+                - Question text
+                - Mathematical equations and expressions (format with LaTeX when possible)
+                - Numbers, measurements, and units
+                - Any labels or annotations
+                - Multiple choice options if present
+                
+                Format the extracted text clearly and preserve the original structure. Use LaTeX notation for mathematical expressions."""
+                
+                extracted_text = call_gemini_vision(extract_prompt, image_data, image_url)
                 
                 # Store context in session for chat
                 session['current_context'] = {
-                    'question_text': question_text,
                     'extracted_text': extracted_text,
-                    'solution': solution,
+                    'solution_sequence': solution_sequence,
                     'has_image': has_image
                 }
                 
@@ -766,10 +1029,9 @@ def home():
     
     return render_template_string(HTML_TEMPLATE,
                                 image_url=image_url,
-                                solution=solution,
+                                solution_sequence=solution_sequence,
                                 error=error,
                                 extracted_text=extracted_text,
-                                question_text=question_text,
                                 chat_history=session.get('chat_history', []))
 
 @app.route('/chat', methods=['POST'])
@@ -785,15 +1047,15 @@ def chat():
         context = session.get('current_context', {})
         
         # Build context-aware prompt
-        chat_prompt = f"""You are continuing a conversation about a JEE question. Here's the context:
+        chat_prompt = f"""You are NY AI, continuing a conversation about a JEE question. Here's the context:
 
-ORIGINAL QUESTION: {context.get('question_text', 'N/A')}
 EXTRACTED TEXT: {context.get('extracted_text', 'N/A')}
-PREVIOUS SOLUTION: {context.get('solution', 'N/A')}
 
 USER'S FOLLOW-UP QUESTION: {user_message}
 
-Please provide a helpful, detailed response. If the user is asking for clarification, provide more detailed explanations. If asking about related concepts, explain those as well."""
+Please provide a helpful, detailed response. Use LaTeX notation for mathematical expressions ($ for inline, $$ for display math). 
+If the user is asking for clarification, provide more detailed explanations. If asking about related concepts, explain those as well.
+Always maintain the NY AI persona - be confident, helpful, and educational."""
         
         # Get AI response
         ai_response = call_gemini_vision(chat_prompt)

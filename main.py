@@ -864,3 +864,232 @@ RESPONSE FORMAT - Provide exactly 6 structured sections:
 - Choose the most efficient method
 
 **SECTION 5: DETAILED CALCULATION**
+- Step-by-step mathematical solution
+- Show all work with proper LaTeX formatting
+- Include intermediate results and explanations
+
+**SECTION 6: FINAL ANSWER & VERIFICATION**
+- Clear final answer with units
+- Verification of the result
+- Common mistakes to avoid
+
+Each section should be clearly separated and use proper LaTeX formatting for all mathematical expressions."""
+    
+    if question_text:
+        base_prompt += f"\n\nQUESTION TEXT:\n{question_text}"
+    
+    if has_image:
+        base_prompt += "\n\nIMAGE: Please analyze the provided image carefully for any additional visual information, diagrams, graphs, or mathematical expressions."
+    
+    return base_prompt
+
+def parse_solution_into_sequence(solution_text):
+    """Parse the solution into sequential steps for better display."""
+    if not solution_text:
+        return []
+    
+    # Split by sections
+    sections = []
+    current_section = ""
+    current_title = ""
+    
+    lines = solution_text.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        
+        # Check if line is a section header
+        if line.startswith('**SECTION') and line.endswith('**'):
+            # Save previous section
+            if current_title and current_section:
+                sections.append({
+                    'title': current_title,
+                    'content': current_section.strip()
+                })
+            
+            # Start new section
+            current_title = line.replace('**SECTION', '').replace('**', '').strip()
+            if ':' in current_title:
+                current_title = current_title.split(':', 1)[1].strip()
+            current_section = ""
+        
+        elif line.startswith('**') and line.endswith('**') and current_section:
+            # Sub-header within section
+            current_section += f"<h4 style='color: #ff6b6b; margin: 15px 0 10px 0;'>{line.replace('**', '')}</h4>\n"
+        
+        else:
+            # Regular content
+            if line:
+                current_section += line + "\n"
+    
+    # Add the last section
+    if current_title and current_section:
+        sections.append({
+            'title': current_title,
+            'content': current_section.strip()
+        })
+    
+    # If no sections found, create a single section
+    if not sections and solution_text:
+        sections.append({
+            'title': 'Complete Solution',
+            'content': solution_text
+        })
+    
+    return sections
+
+@app.route('/', methods=['GET', 'POST'])
+def home():
+    # Initialize session variables
+    if 'chat_history' not in session:
+        session['chat_history'] = []
+    
+    image_url = None
+    solution_sequence = None
+    error = None
+    extracted_text = None
+    
+    if request.method == 'POST':
+        try:
+            # Get inputs
+            image_url = request.form.get('image_url', '').strip()
+            
+            image_data = None
+            has_image = False
+            
+            # Handle file upload
+            if 'image_file' in request.files and request.files['image_file'].filename:
+                file = request.files['image_file']
+                if file and file.filename != '':
+                    try:
+                        # Validate file type
+                        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+                        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+                        
+                        if file_ext not in allowed_extensions:
+                            error = "Please upload a valid image file (PNG, JPG, JPEG, GIF, WebP)."
+                        else:
+                            image_data = file.read()
+                            # Create data URL for display
+                            image_b64 = base64.b64encode(image_data).decode('utf-8')
+                            image_url = f"data:image/{file_ext};base64,{image_b64}"
+                            has_image = True
+                    except Exception as e:
+                        error = f"Error processing uploaded file: {str(e)}"
+            
+            # Handle URL input
+            elif image_url:
+                if image_url.startswith('data:'):
+                    # Data URL - extract base64 data
+                    try:
+                        header, data = image_url.split(',', 1)
+                        image_data = base64.b64decode(data)
+                        has_image = True
+                    except Exception as e:
+                        error = f"Error processing data URL: {str(e)}"
+                else:
+                    # External URL
+                    has_image = True
+            
+            # Validate input
+            if not has_image:
+                error = "Please provide an image (upload or URL)."
+            
+            elif not error:
+                # Create enhanced prompt for sequential solution
+                prompt = create_sequential_prompt(None, has_image)
+                
+                # Call Gemini API
+                solution = call_gemini_vision(prompt, image_data, image_url)
+                
+                # Parse solution into sequence
+                solution_sequence = parse_solution_into_sequence(solution)
+                
+                # Extract text for display purposes
+                extract_prompt = """Please extract ALL text content from this image, including:
+                - Question text
+                - Mathematical equations and expressions (format with LaTeX when possible)
+                - Numbers, measurements, and units
+                - Any labels or annotations
+                - Multiple choice options if present
+                
+                Format the extracted text clearly and preserve the original structure. Use LaTeX notation for mathematical expressions."""
+                
+                extracted_text = call_gemini_vision(extract_prompt, image_data, image_url)
+                
+                # Store context in session for chat
+                session['current_context'] = {
+                    'extracted_text': extracted_text,
+                    'solution_sequence': solution_sequence,
+                    'has_image': has_image
+                }
+                
+        except Exception as e:
+            error = f"An unexpected error occurred: {str(e)}"
+    
+    return render_template_string(HTML_TEMPLATE,
+                                image_url=image_url,
+                                solution_sequence=solution_sequence,
+                                error=error,
+                                extracted_text=extracted_text,
+                                chat_history=session.get('chat_history', []))
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '').strip()
+        
+        if not user_message:
+            return jsonify({'error': 'Empty message'}), 400
+        
+        # Get current context
+        context = session.get('current_context', {})
+        
+        # Build context-aware prompt
+        chat_prompt = f"""You are NY AI, continuing a conversation about a JEE question. Here's the context:
+
+EXTRACTED TEXT: {context.get('extracted_text', 'N/A')}
+
+USER'S FOLLOW-UP QUESTION: {user_message}
+
+Please provide a helpful, detailed response. Use LaTeX notation for mathematical expressions ($ for inline, $$ for display math). 
+If the user is asking for clarification, provide more detailed explanations. If asking about related concepts, explain those as well.
+Always maintain the NY AI persona - be confident, helpful, and educational."""
+        
+        # Get AI response
+        ai_response = call_gemini_vision(chat_prompt)
+        
+        # Add to chat history
+        if 'chat_history' not in session:
+            session['chat_history'] = []
+        
+        session['chat_history'].append({
+            'role': 'user',
+            'content': user_message
+        })
+        
+        session['chat_history'].append({
+            'role': 'ai',
+            'content': ai_response
+        })
+        
+        # Keep only last 20 messages to prevent session overflow
+        if len(session['chat_history']) > 20:
+            session['chat_history'] = session['chat_history'][-20:]
+        
+        session.modified = True
+        
+        return jsonify({'response': ai_response})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/clear_chat', methods=['POST'])
+def clear_chat():
+    session['chat_history'] = []
+    session.modified = True
+    return jsonify({'success': True})
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)

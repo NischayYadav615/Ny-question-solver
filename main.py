@@ -1,19 +1,20 @@
 import os
 import json
 import base64
-from flask import Flask, request, render_template_string, session, jsonify
+from flask import Flask, request, jsonify
 import requests
-from dotenv import load_dotenv
 import re
 from PIL import Image, ImageEnhance, ImageFilter
 import io
 
-load_dotenv()
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.environ.get('SECRET_KEY', 'vercel-jee-solver-key-2025')
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or "AIzaSyDHFTMIgNpOSwOnGRhgaL2Y960BYV2O56s"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDHFTMIgNpOSwOnGRhgaL2Y960BYV2O56s")
 GEMINI_VISION_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
+
+# Global session storage (for Vercel)
+session_data = {}
 
 def process_image_with_pil(image_data):
     """Process image using PIL for better quality."""
@@ -284,7 +285,7 @@ def call_api_with_parts(parts):
         response = requests.post(GEMINI_VISION_URL, 
                                headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY}, 
                                json=payload, 
-                               timeout=45)
+                               timeout=25)
         response.raise_for_status()
         
         result = response.json()
@@ -302,7 +303,10 @@ def call_api_with_parts(parts):
     except Exception as e:
         return f"NY AI request failed: {str(e)}"
 
-HTML_TEMPLATE = """
+@app.route('/')
+def home():
+    """Serve the main HTML page."""
+    return '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -690,6 +694,16 @@ HTML_TEMPLATE = """
             margin: 15px 0;
         }
         
+        .info-display {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 15px;
+        }
+        
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -749,43 +763,31 @@ HTML_TEMPLATE = """
                     <button class="tab" onclick="switchTab('text')">✏️ Type</button>
                 </div>
                 
-                <form method="POST" enctype="multipart/form-data" id="solverForm">
-                    <div id="upload-panel" class="tab-panel active">
-                        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
-                            <div class="upload-icon">📁</div>
-                            <div><strong>Upload Image</strong></div>
-                            <div style="font-size: 13px; color: #64748b; margin-top: 8px;">
-                                Drag &amp; drop or click to browse
-                            </div>
-                            <input type="file" id="fileInput" name="image_file" accept="image/*" style="display: none;" onchange="handleFileUpload(this)">
+                <div id="upload-panel" class="tab-panel active">
+                    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon">📁</div>
+                        <div><strong>Upload Image</strong></div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 8px;">
+                            Drag &amp; drop or click to browse
                         </div>
+                        <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileUpload(this)">
                     </div>
-                    
-                    <div id="url-panel" class="tab-panel">
-                        <input type="url" name="image_url" placeholder="Paste image URL..." value="{% if image_url %}{{ image_url }}{% endif %}">
-                    </div>
-                    
-                    <div id="text-panel" class="tab-panel">
-                        <textarea name="question_text" rows="6" placeholder="Type your JEE question here...">{% if question_text %}{{ question_text }}{% endif %}</textarea>
-                    </div>
-                    
-                    <button type="submit" class="solve-btn" id="solveBtn">
-                        🧠 Solve with NY AI
-                    </button>
-                </form>
-                
-                {% raw %}{% if image_url %}{% endraw %}
-                <div style="margin-top: 20px;">
-                    <div style="font-size: 14px; color: #94a3b8; margin-bottom: 10px;">📷 Image</div>
-                    <img src="{% raw %}{{ image_url }}{% endraw %}" class="image-preview" alt="Question">
                 </div>
-                {% raw %}{% endif %}{% endraw %}
                 
-                {% raw %}{% if image_info %}{% endraw %}
-                <div style="margin-top: 15px; padding: 12px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; font-size: 13px; color: #00d4ff;">
-                    <strong>Image Info:</strong> {% raw %}{{ image_info }}{% endraw %}
+                <div id="url-panel" class="tab-panel">
+                    <input type="url" id="imageUrl" placeholder="Paste image URL...">
                 </div>
-                {% raw %}{% endif %}{% endraw %}
+                
+                <div id="text-panel" class="tab-panel">
+                    <textarea id="questionText" rows="6" placeholder="Type your JEE question here..."></textarea>
+                </div>
+                
+                <button onclick="solveQuestion()" class="solve-btn" id="solveBtn">
+                    🧠 Solve with NY AI
+                </button>
+                
+                <div id="imagePreviewContainer"></div>
+                <div id="imageInfoContainer"></div>
             </div>
             
             <div class="solution-side">
@@ -797,33 +799,23 @@ HTML_TEMPLATE = """
                     <div style="color: #64748b; margin-top: 8px;">Processing mathematical expressions</div>
                 </div>
                 
-                {% raw %}{% if solution %}{% endraw %}
-                <div class="solution-content">
-                    {% raw %}{{ solution|safe }}{% endraw %}
+                <div id="solutionContainer">
+                    <div class="empty-display">
+                        <div class="empty-icon">🤖</div>
+                        <h3>NY AI Ready</h3>
+                        <p>Upload an image or type a question to get started</p>
+                    </div>
                 </div>
-                {% raw %}{% else %}{% endraw %}
-                <div class="empty-display">
-                    <div class="empty-icon">🤖</div>
-                    <h3>NY AI Ready</h3>
-                    <p>Upload an image or type a question to get started</p>
-                </div>
-                {% raw %}{% endif %}{% endraw %}
                 
-                {% raw %}{% if error %}{% endraw %}
-                <div class="error-msg">
-                    <strong>⚠️ Error:</strong> {% raw %}{{ error }}{% endraw %}
-                </div>
-                {% raw %}{% endif %}{% endraw %}
+                <div id="errorContainer"></div>
                 
                 <div class="chat-area">
                     <div class="section-title">💬 Chat with NY AI</div>
                     
                     <div class="chat-messages" id="chatBox">
-                        {% raw %}{% for msg in chat_history %}{% endraw %}
-                        <div class="message {% raw %}{{ 'user-msg' if msg.role == 'user' else 'ai-msg' }}{% endraw %}">
-                            {% raw %}{{ msg.content }}{% endraw %}
+                        <div class="message ai-msg">
+                            👋 Hi! I'm NY AI. Upload a JEE question and I'll solve it step by step!
                         </div>
-                        {% raw %}{% endfor %}{% endraw %}
                     </div>
                     
                     <div class="chat-input-area">
@@ -836,21 +828,25 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
+        let currentImageData = null;
+        let currentImageUrl = '';
+        let chatHistory = [];
+        
         window.MathJax = {
             tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
+                displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
                 processEscapes: true,
                 processEnvironments: true,
                 tags: 'ams',
                 macros: {
-                    R: "\\mathbb{R}",
-                    C: "\\mathbb{C}",
-                    N: "\\mathbb{N}",
-                    Z: "\\mathbb{Z}",
-                    Q: "\\mathbb{Q}",
-                    deg: "^\\circ",
-                    frac: ["\\frac{#1}{#2}", 2]
+                    R: "\\\\mathbb{R}",
+                    C: "\\\\mathbb{C}",
+                    N: "\\\\mathbb{N}",
+                    Z: "\\\\mathbb{Z}",
+                    Q: "\\\\mathbb{Q}",
+                    deg: "^\\\\circ",
+                    frac: ["\\\\frac{#1}{#2}", 2]
                 }
             },
             svg: {
@@ -887,18 +883,16 @@ HTML_TEMPLATE = """
                 const reader = new FileReader();
                 
                 reader.onload = function(e) {
-                    let preview = document.getElementById('imagePreview');
-                    if (!preview) {
-                        const previewDiv = document.createElement('div');
-                        previewDiv.innerHTML = `
-                            <div style="font-size: 14px; color: #94a3b8; margin-bottom: 10px;">📷 Preview</div>
-                            <img id="imagePreview" class="image-preview" alt="Preview">
-                        `;
-                        input.closest('.input-side').appendChild(previewDiv);
-                        preview = document.getElementById('imagePreview');
-                    }
+                    currentImageData = e.target.result;
+                    currentImageUrl = e.target.result;
                     
-                    preview.src = e.target.result;
+                    const container = document.getElementById('imagePreviewContainer');
+                    container.innerHTML = `
+                        <div style="font-size: 14px; color: #94a3b8; margin: 20px 0 10px 0;">📷 Preview</div>
+                        <img src="${e.target.result}" class="image-preview" alt="Preview">
+                    `;
+                    
+                    const preview = container.querySelector('img');
                     gsap.fromTo(preview, 
                         { opacity: 0, scale: 0.9 }, 
                         { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.7)" }
@@ -934,14 +928,109 @@ HTML_TEMPLATE = """
             }
         });
         
-        document.getElementById('solverForm').addEventListener('submit', function() {
+        function solveQuestion() {
             const loading = document.getElementById('loadingState');
             const btn = document.getElementById('solveBtn');
+            const solutionContainer = document.getElementById('solutionContainer');
+            const errorContainer = document.getElementById('errorContainer');
             
             loading.classList.add('active');
             btn.disabled = true;
             btn.textContent = '🔄 Processing...';
-        });
+            solutionContainer.innerHTML = '';
+            errorContainer.innerHTML = '';
+            
+            const formData = new FormData();
+            
+            // Get active tab data
+            const activeTab = document.querySelector('.tab.active').textContent;
+            
+            if (activeTab.includes('Upload') && currentImageData) {
+                // Convert base64 to blob for upload
+                fetch(currentImageData)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        formData.append('image_file', blob, 'image.jpg');
+                        submitForm(formData);
+                    });
+            } else if (activeTab.includes('URL')) {
+                const imageUrl = document.getElementById('imageUrl').value.trim();
+                if (imageUrl) {
+                    formData.append('image_url', imageUrl);
+                }
+                submitForm(formData);
+            } else if (activeTab.includes('Type')) {
+                const questionText = document.getElementById('questionText').value.trim();
+                if (questionText) {
+                    formData.append('question_text', questionText);
+                }
+                submitForm(formData);
+            } else {
+                showError('Please provide either an image or text question.');
+                resetButton();
+            }
+        }
+        
+        function submitForm(formData) {
+            fetch('/solve', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const loading = document.getElementById('loadingState');
+                const solutionContainer = document.getElementById('solutionContainer');
+                const errorContainer = document.getElementById('errorContainer');
+                
+                loading.classList.remove('active');
+                
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    solutionContainer.innerHTML = data.solution || 'No solution generated.';
+                    
+                    if (data.image_info) {
+                        document.getElementById('imageInfoContainer').innerHTML = `
+                            <div class="info-display">
+                                <strong>Image Info:</strong> ${data.image_info}
+                            </div>
+                        `;
+                    }
+                    
+                    // Re-render MathJax for new content
+                    MathJax.typesetPromise([solutionContainer]).then(() => {
+                        gsap.fromTo(solutionContainer.children, 
+                            { opacity: 0, y: 20 }, 
+                            { opacity: 1, y: 0, duration: 0.6, stagger: 0.1, ease: "power2.out" }
+                        );
+                    }).catch((err) => console.log('MathJax error:', err));
+                }
+                
+                resetButton();
+            })
+            .catch(error => {
+                showError('Connection error: ' + error.message);
+                resetButton();
+            });
+        }
+        
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `
+                <div class="error-msg">
+                    <strong>⚠️ Error:</strong> ${message}
+                </div>
+            `;
+        }
+        
+        function resetButton() {
+            const btn = document.getElementById('solveBtn');
+            const loading = document.getElementById('loadingState');
+            
+            loading.classList.remove('active');
+            btn.disabled = false;
+            btn.textContent = '🧠 Solve with NY AI';
+        }
         
         function handleEnterKey(event) {
             if (event.key === 'Enter') {
@@ -1015,22 +1104,22 @@ HTML_TEMPLATE = """
         
         function enhance_math_notation(text) {
             const conversions = [
-                [/(\w+)\s*=\s*([^,\n\.;]+)/g, '$\\1 = \\2$'],
-                [/(\d+)\/(\d+)/g, '$\\frac{\\1}{\\2}$'],
-                [/(\w+)\^(\d+)/g, '$\\1^{\\2}$'],
-                [/(\w)_(\d+)/g, '$\\1_{\\2}$'],
-                [/sqrt\(([^)]+)\)/gi, '$\\sqrt{\\1}$'],
-                [/sin\s*\(([^)]+)\)/gi, '$\\sin(\\1)$'],
-                [/cos\s*\(([^)]+)\)/gi, '$\\cos(\\1)$'],
-                [/tan\s*\(([^)]+)\)/gi, '$\\tan(\\1)$'],
-                [/\bpi\b/gi, '$\\pi$'],
-                [/\btheta\b/gi, '$\\theta$'],
-                [/\balpha\b/gi, '$\\alpha$'],
-                [/\bbeta\b/gi, '$\\beta$'],
-                [/(\d+)\s*degrees?/gi, '$\\1^\\circ$'],
-                [/\[([MLT\^A\-\d\s]+)\]/g, '$[\\1]$'],
-                [/→/g, '$\\rightarrow$'],
-                [/±/g, '$\\pm$']
+                [/(\\w+)\\s*=\\s*([^,\\n\\.;]+)/g, '$\\\\1 = \\\\2$'],
+                [/(\\d+)\\/(\\d+)/g, '$\\\\frac{\\\\1}{\\\\2}$'],
+                [/(\\w+)\\^(\\d+)/g, '$\\\\1^{\\\\2}$'],
+                [/(\\w)_(\\d+)/g, '$\\\\1_{\\\\2}$'],
+                [/sqrt\\(([^)]+)\\)/gi, '$\\\\sqrt{\\\\1}$'],
+                [/sin\\s*\\(([^)]+)\\)/gi, '$\\\\sin(\\\\1)$'],
+                [/cos\\s*\\(([^)]+)\\)/gi, '$\\\\cos(\\\\1)$'],
+                [/tan\\s*\\(([^)]+)\\)/gi, '$\\\\tan(\\\\1)$'],
+                [/\\bpi\\b/gi, '$\\\\pi$'],
+                [/\\btheta\\b/gi, '$\\\\theta$'],
+                [/\\balpha\\b/gi, '$\\\\alpha$'],
+                [/\\bbeta\\b/gi, '$\\\\beta$'],
+                [/(\\d+)\\s*degrees?/gi, '$\\\\1^\\\\circ$'],
+                [/\\[([MLT\\^A\\-\\d\\s]+)\\]/g, '$[\\\\1]$'],
+                [/→/g, '$\\\\rightarrow$'],
+                [/±/g, '$\\\\pm$']
             ];
             
             conversions.forEach(([pattern, replacement]) => {
@@ -1042,98 +1131,94 @@ HTML_TEMPLATE = """
     </script>
 </body>
 </html>
-"""
+    '''
 
-@app.route('/', methods=['GET', 'POST'])
-def home():
-    if 'chat_history' not in session:
-        session['chat_history'] = []
-    
-    image_url = None
-    solution = None
-    error = None
-    question_text = None
-    image_info = None
-    
-    if request.method == 'POST':
-        try:
-            image_url = request.form.get('image_url', '').strip()
-            question_text = request.form.get('question_text', '').strip()
-            
-            image_data = None
-            has_image = False
-            
-            if 'image_file' in request.files and request.files['image_file'].filename:
-                file = request.files['image_file']
-                if file and file.filename != '':
-                    try:
-                        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff'}
-                        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-                        
-                        if file_ext not in allowed_extensions:
-                            error = "Please upload a valid image file."
-                        else:
-                            image_data = file.read()
-                            processed_data, img_size = process_image_with_pil(image_data)
-                            image_b64 = base64.b64encode(processed_data).decode('utf-8')
-                            image_url = f"data:image/jpeg;base64,{image_b64}"
-                            image_info = f"{img_size[0]}×{img_size[1]} pixels, PIL enhanced"
-                            has_image = True
-                    except Exception as e:
-                        error = f"Error processing image: {str(e)}"
-            
-            elif image_url:
-                if image_url.startswith('data:'):
-                    try:
-                        header, data = image_url.split(',', 1)
-                        image_data = base64.b64decode(data)
-                        has_image = True
-                    except Exception as e:
-                        error = f"Error processing data URL: {str(e)}"
-                else:
+@app.route('/solve', methods=['POST'])
+def solve():
+    """Handle problem solving requests."""
+    try:
+        image_url = request.form.get('image_url', '').strip()
+        question_text = request.form.get('question_text', '').strip()
+        
+        image_data = None
+        has_image = False
+        image_info = None
+        
+        # Handle file upload
+        if 'image_file' in request.files and request.files['image_file'].filename:
+            file = request.files['image_file']
+            if file and file.filename != '':
+                try:
+                    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff'}
+                    file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+                    
+                    if file_ext not in allowed_extensions:
+                        return jsonify({'error': 'Please upload a valid image file.'})
+                    
+                    image_data = file.read()
+                    processed_data, img_size = process_image_with_pil(image_data)
+                    image_info = f"{img_size[0]}×{img_size[1]} pixels, PIL enhanced"
                     has_image = True
-            
-            if not question_text and not has_image:
-                error = "Please provide either an image or text question."
-            
-            elif not error:
-                prompt = create_advanced_prompt(question_text, has_image)
-                
-                if has_image:
-                    solution, img_info = call_gemini_vision(prompt, image_data, image_url)
-                    if img_info:
-                        image_info = img_info
-                else:
-                    solution, _ = call_gemini_vision(prompt)
-                
-                session['current_context'] = {
-                    'question_text': question_text,
-                    'solution': solution,
-                    'has_image': has_image,
-                    'subject_area': 'JEE'
-                }
-                
-        except Exception as e:
-            error = f"An unexpected error occurred: {str(e)}"
-    
-    return render_template_string(HTML_TEMPLATE,
-                                image_url=image_url,
-                                solution=solution,
-                                error=error,
-                                question_text=question_text,
-                                image_info=image_info,
-                                chat_history=session.get('chat_history', []))
+                    
+                except Exception as e:
+                    return jsonify({'error': f'Error processing image: {str(e)}'})
+        
+        # Handle URL
+        elif image_url:
+            if image_url.startswith('data:'):
+                try:
+                    header, data = image_url.split(',', 1)
+                    image_data = base64.b64decode(data)
+                    has_image = True
+                except Exception as e:
+                    return jsonify({'error': f'Error processing data URL: {str(e)}'})
+            else:
+                has_image = True
+        
+        # Validate input
+        if not question_text and not has_image:
+            return jsonify({'error': 'Please provide either an image or text question.'})
+        
+        # Generate solution
+        prompt = create_advanced_prompt(question_text, has_image)
+        
+        if has_image:
+            solution, img_info = call_gemini_vision(prompt, image_data, image_url)
+            if img_info:
+                image_info = img_info
+        else:
+            solution, _ = call_gemini_vision(prompt)
+        
+        # Store context for chat
+        session_id = request.remote_addr  # Simple session ID
+        session_data[session_id] = {
+            'question_text': question_text,
+            'solution': solution,
+            'has_image': has_image,
+            'subject_area': 'JEE'
+        }
+        
+        return jsonify({
+            'solution': solution,
+            'image_info': image_info,
+            'success': True
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'An unexpected error occurred: {str(e)}'})
 
 @app.route('/chat', methods=['POST'])
 def chat():
+    """Handle chat requests."""
     try:
         data = request.get_json()
         user_message = data.get('message', '').strip()
         
         if not user_message:
-            return jsonify({'error': 'Empty message'}), 400
+            return jsonify({'error': 'Empty message'})
         
-        context = session.get('current_context', {})
+        session_id = request.remote_addr
+        context = session_data.get(session_id, {})
         
         chat_prompt = f"""You are NY AI continuing a JEE problem discussion.
 
@@ -1147,27 +1232,20 @@ Provide clear, educational response with proper mathematical notation and sequen
         
         ai_response, _ = call_gemini_vision(chat_prompt)
         
-        if 'chat_history' not in session:
-            session['chat_history'] = []
-        
-        session['chat_history'].append({'role': 'user', 'content': user_message})
-        session['chat_history'].append({'role': 'ai', 'content': ai_response})
-        
-        if len(session['chat_history']) > 20:
-            session['chat_history'] = session['chat_history'][-20:]
-        
-        session.modified = True
-        
         return jsonify({'response': ai_response})
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)})
 
-@app.route('/clear_chat', methods=['POST'])
-def clear_chat():
-    session['chat_history'] = []
-    session.modified = True
-    return jsonify({'success': True})
+@app.route('/health')
+def health():
+    """Health check endpoint."""
+    return jsonify({'status': 'healthy', 'service': 'NY AI JEE Solver'})
+
+# Vercel serverless function handler
+def handler(request, context):
+    """Vercel serverless function handler."""
+    return app(request.environ, context)
 
 if __name__ == '__main__':
     print("🚀 NY AI JEE Solver Starting...")

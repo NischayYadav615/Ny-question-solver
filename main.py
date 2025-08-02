@@ -755,18 +755,18 @@ HTML_TEMPLATE = """
                             <div class="upload-icon">📁</div>
                             <div><strong>Upload Image</strong></div>
                             <div style="font-size: 13px; color: #64748b; margin-top: 8px;">
-                                Drag & drop or click to browse
+                                Drag &amp; drop or click to browse
                             </div>
                             <input type="file" id="fileInput" name="image_file" accept="image/*" style="display: none;" onchange="handleFileUpload(this)">
                         </div>
                     </div>
                     
                     <div id="url-panel" class="tab-panel">
-                        <input type="url" name="image_url" placeholder="Paste image URL..." value="{{ image_url or '' }}">
+                        <input type="url" name="image_url" placeholder="Paste image URL..." value="{% if image_url %}{{ image_url }}{% endif %}">
                     </div>
                     
                     <div id="text-panel" class="tab-panel">
-                        <textarea name="question_text" rows="6" placeholder="Type your JEE question here...">{{ question_text or '' }}</textarea>
+                        <textarea name="question_text" rows="6" placeholder="Type your JEE question here...">{% if question_text %}{{ question_text }}{% endif %}</textarea>
                     </div>
                     
                     <button type="submit" class="solve-btn" id="solveBtn">
@@ -774,18 +774,18 @@ HTML_TEMPLATE = """
                     </button>
                 </form>
                 
-                {% if image_url %}
+                {% raw %}{% if image_url %}{% endraw %}
                 <div style="margin-top: 20px;">
                     <div style="font-size: 14px; color: #94a3b8; margin-bottom: 10px;">📷 Image</div>
-                    <img src="{{ image_url }}" class="image-preview" alt="Question">
+                    <img src="{% raw %}{{ image_url }}{% endraw %}" class="image-preview" alt="Question">
                 </div>
-                {% endif %}
+                {% raw %}{% endif %}{% endraw %}
                 
-                {% if image_info %}
+                {% raw %}{% if image_info %}{% endraw %}
                 <div style="margin-top: 15px; padding: 12px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; font-size: 13px; color: #00d4ff;">
-                    <strong>Image Info:</strong> {{ image_info }}
+                    <strong>Image Info:</strong> {% raw %}{{ image_info }}{% endraw %}
                 </div>
-                {% endif %}
+                {% raw %}{% endif %}{% endraw %}
             </div>
             
             <div class="solution-side">
@@ -797,33 +797,33 @@ HTML_TEMPLATE = """
                     <div style="color: #64748b; margin-top: 8px;">Processing mathematical expressions</div>
                 </div>
                 
-                {% if solution %}
+                {% raw %}{% if solution %}{% endraw %}
                 <div class="solution-content">
-                    {{ solution|safe }}
+                    {% raw %}{{ solution|safe }}{% endraw %}
                 </div>
-                {% else %}
+                {% raw %}{% else %}{% endraw %}
                 <div class="empty-display">
                     <div class="empty-icon">🤖</div>
                     <h3>NY AI Ready</h3>
                     <p>Upload an image or type a question to get started</p>
                 </div>
-                {% endif %}
+                {% raw %}{% endif %}{% endraw %}
                 
-                {% if error %}
+                {% raw %}{% if error %}{% endraw %}
                 <div class="error-msg">
-                    <strong>⚠️ Error:</strong> {{ error }}
+                    <strong>⚠️ Error:</strong> {% raw %}{{ error }}{% endraw %}
                 </div>
-                {% endif %}
+                {% raw %}{% endif %}{% endraw %}
                 
                 <div class="chat-area">
                     <div class="section-title">💬 Chat with NY AI</div>
                     
                     <div class="chat-messages" id="chatBox">
-                        {% for msg in chat_history %}
-                        <div class="message {{ 'user-msg' if msg.role == 'user' else 'ai-msg' }}">
-                            {{ msg.content }}
+                        {% raw %}{% for msg in chat_history %}{% endraw %}
+                        <div class="message {% raw %}{{ 'user-msg' if msg.role == 'user' else 'ai-msg' }}{% endraw %}">
+                            {% raw %}{{ msg.content }}{% endraw %}
                         </div>
-                        {% endfor %}
+                        {% raw %}{% endfor %}{% endraw %}
                     </div>
                     
                     <div class="chat-input-area">

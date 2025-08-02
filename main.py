@@ -1173,4 +1173,4 @@ if __name__ == '__main__':
     print("🚀 NY AI JEE Solver Starting...")
     print("🎯 Features: PIL Processing, MathJax Rendering, Sequential Solutions")
     print("🌐 Server: http://localhost:5000")
-    app.run(debug=True, host='0.0.0.0', port=5000)ingState">
+    app.run(debug=True, host='0.0.0.0', port=5000)

@@ -43,175 +43,402 @@ HTML_TEMPLATE = """
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
     
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+        }
+        
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5a67d8;
+            --secondary: #764ba2;
+            --accent: #ff6b6b;
+            --accent-light: #ffd93d;
+            --success: #48bb78;
+            --bg-primary: #f8fafc;
+            --bg-secondary: #edf2f7;
+            --text-primary: #2d3748;
+            --text-secondary: #4a5568;
+            --text-light: #718096;
+            --border: #e2e8f0;
+            --shadow: 0 10px 40px rgba(0,0,0,0.1);
+            --shadow-lg: 0 20px 60px rgba(0,0,0,0.15);
+            --radius: 16px;
+            --radius-lg: 24px;
+        }
+        
         body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
             padding: 20px;
         }
         
         .main-wrapper {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, var(--success) 100%);
+            color: white;
+            padding: 50px 30px;
+            text-align: center;
+            position: relative;
             overflow: hidden;
         }
         
-        .header {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ffd93d 50%, #6bcf7f 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-            position: relative;
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 50%);
+            animation: headerShine 6s ease-in-out infinite;
+        }
+        
+        @keyframes headerShine {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
         }
         
         .ny-ai-logo {
-            font-size: 3rem;
-            font-weight: bold;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            letter-spacing: -2px;
+            position: relative;
+            z-index: 1;
         }
         
         .header h1 { 
-            font-size: 2.5rem; 
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-size: 2.8rem; 
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1;
         }
+        
         .header p { 
-            font-size: 1.1rem; 
-            opacity: 0.9; 
+            font-size: 1.2rem; 
+            opacity: 0.95; 
+            font-weight: 400;
+            position: relative;
+            z-index: 1;
         }
         
+        .ny-ai-badge {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            background: rgba(255,255,255,0.25);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        /* Main Content */
         .main-content { 
-            display: flex; 
-            gap: 20px; 
-            padding: 30px;
-            min-height: calc(100vh - 200px);
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px; 
+            padding: 40px;
+            min-height: 600px;
         }
-        .left-panel { flex: 1; max-width: 500px; }
-        .right-panel { flex: 2; }
         
-        .input-section {
-            background: #f8fafc;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            border: 2px dashed #e2e8f0;
-            transition: all 0.3s ease;
+        .left-panel, .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
         }
-        .input-section:hover { border-color: #ff6b6b; }
+        
+        /* Input Section */
+        .input-section {
+            background: var(--bg-primary);
+            border-radius: var(--radius);
+            padding: 30px;
+            border: 2px solid transparent;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .input-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(255, 107, 107, 0.1) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .input-section:hover::before {
+            opacity: 1;
+        }
+        
+        .input-section:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+        
+        .input-section h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            position: relative;
+            z-index: 1;
+        }
         
         .tab-buttons {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 12px;
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 1;
         }
+        
         .tab-btn {
             padding: 12px 24px;
             border: none;
-            border-radius: 25px;
-            background: #e2e8f0;
-            color: #64748b;
+            border-radius: 30px;
+            background: var(--border);
+            color: var(--text-secondary);
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             font-weight: 600;
-        }
-        .tab-btn.active {
-            background: #ff6b6b;
-            color: white;
+            font-size: 0.95rem;
+            position: relative;
+            overflow: hidden;
         }
         
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        .tab-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+        
+        .tab-btn:hover::before {
+            left: 100%;
+        }
+        
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .tab-content { 
+            display: none; 
+            position: relative;
+            z-index: 1;
+        }
+        .tab-content.active { 
+            display: block; 
+            animation: fadeInUp 0.4s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         
         .file-upload {
-            border: 3px dashed #cbd5e1;
-            border-radius: 15px;
-            padding: 40px;
+            border: 3px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 50px 30px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: #f1f5f9;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: white;
+            position: relative;
+            overflow: hidden;
         }
-        .file-upload:hover {
-            border-color: #ff6b6b;
-            background: #fff5f5;
+        
+        .file-upload::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+            transition: all 0.4s ease;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
         }
-        .file-upload.drag-over {
-            border-color: #ff6b6b;
-            background: #fff1f1;
+        
+        .file-upload:hover::before {
+            width: 200px;
+            height: 200px;
+        }
+        
+        .file-upload:hover, .file-upload.drag-over {
+            border-color: var(--primary);
+            background: rgba(102, 126, 234, 0.05);
             transform: scale(1.02);
+        }
+        
+        .file-upload div {
+            position: relative;
+            z-index: 1;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+        }
+        
+        .file-upload small {
+            position: relative;
+            z-index: 1;
+            color: var(--text-light);
+            display: block;
+            margin-top: 10px;
         }
         
         input[type="url"] {
             width: 100%;
-            padding: 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
+            padding: 18px 20px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
             font-size: 16px;
-            transition: border-color 0.3s ease;
+            transition: all 0.3s ease;
+            background: white;
+            font-family: inherit;
         }
+        
         input[type="url"]:focus {
             outline: none;
-            border-color: #ff6b6b;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-1px);
         }
         
         .solve-btn {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            background: linear-gradient(135deg, var(--accent) 0%, var(--primary) 100%);
             color: white;
-            padding: 18px 40px;
+            padding: 20px 40px;
             border: none;
-            border-radius: 12px;
+            border-radius: var(--radius);
             font-size: 18px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             width: 100%;
-            margin-top: 20px;
+            margin-top: 25px;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.5px;
         }
+        
+        .solve-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.6s;
+        }
+        
+        .solve-btn:hover::before {
+            left: 100%;
+        }
+        
         .solve-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(255, 107, 107, 0.3);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(255, 107, 107, 0.4);
         }
+        
+        .solve-btn:active {
+            transform: translateY(-1px);
+        }
+        
         .solve-btn:disabled {
-            background: #9ca3af;
+            background: var(--text-light);
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
         
         .image-preview {
             max-width: 100%;
-            border-radius: 10px;
+            border-radius: var(--radius);
             margin: 20px 0;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease;
         }
         
+        .image-preview:hover {
+            transform: scale(1.02);
+        }
+        
+        /* Solution Area */
         .solution-area {
-            background: #f8fafc;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            min-height: 300px;
+            background: var(--bg-primary);
+            border-radius: var(--radius);
+            padding: 30px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .solution-area h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 25px;
+            color: var(--text-primary);
         }
         
         .solution-sequence {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 25px;
         }
         
         .solution-step {
             background: white;
-            border-radius: 12px;
-            padding: 20px;
-            border-left: 4px solid #ff6b6b;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border-radius: var(--radius);
+            padding: 25px;
+            border-left: 5px solid var(--accent);
+            box-shadow: 0 6px 25px rgba(0,0,0,0.08);
             opacity: 0;
-            transform: translateY(20px);
-            animation: slideIn 0.6s ease forwards;
+            transform: translateY(30px);
+            animation: slideInStep 0.6s ease forwards;
+            position: relative;
+            overflow-x: auto;
         }
         
         .solution-step:nth-child(1) { animation-delay: 0.1s; }
@@ -221,7 +448,7 @@ HTML_TEMPLATE = """
         .solution-step:nth-child(5) { animation-delay: 0.5s; }
         .solution-step:nth-child(6) { animation-delay: 0.6s; }
         
-        @keyframes slideIn {
+        @keyframes slideInStep {
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -231,157 +458,217 @@ HTML_TEMPLATE = """
         .step-header {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
-            font-weight: 600;
-            color: #374151;
+            gap: 15px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-size: 1.1rem;
         }
         
         .step-number {
-            background: #ff6b6b;
+            background: linear-gradient(135deg, var(--accent), var(--primary));
             color: white;
-            width: 30px;
-            height: 30px;
+            width: 35px;
+            height: 35px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 16px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
         }
         
         .step-content {
             line-height: 1.8;
-            color: #374151;
+            color: var(--text-secondary);
+            overflow-x: auto;
+            word-break: break-word;
         }
         
-        .math-expression {
-            background: #f1f5f9;
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
+        /* Math expressions with horizontal scroll */
+        .math-expression, .MathJax {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid var(--accent-light);
             font-family: 'Courier New', monospace;
-            border-left: 3px solid #ffd93d;
+        }
+        
+        .MathJax_Display {
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
         }
         
         .final-answer {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, var(--success) 0%, #38a169 100%);
             color: white;
-            padding: 20px;
-            border-radius: 12px;
+            padding: 25px;
+            border-radius: var(--radius);
             text-align: center;
-            font-size: 1.2rem;
-            font-weight: bold;
-            margin-top: 20px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-top: 25px;
+            box-shadow: 0 8px 25px rgba(72, 187, 120, 0.3);
         }
         
+        /* Chat Area */
         .chat-area {
-            background: #f8fafc;
-            border-radius: 15px;
-            padding: 25px;
-            height: 400px;
+            background: var(--bg-primary);
+            border-radius: var(--radius);
+            padding: 30px;
+            height: 500px;
             display: flex;
             flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chat-area h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-primary);
         }
         
         .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 10px;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             background: white;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            scroll-behavior: smooth;
+        }
+        
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 3px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
         }
         
         .message {
-            margin-bottom: 15px;
-            padding: 12px 16px;
-            border-radius: 18px;
-            max-width: 80%;
+            margin-bottom: 18px;
+            padding: 15px 20px;
+            border-radius: 20px;
+            max-width: 85%;
+            word-wrap: break-word;
+            animation: messageSlideIn 0.4s ease-out;
+            position: relative;
+            overflow-x: auto;
+        }
+        
+        @keyframes messageSlideIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px) scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+            }
         }
         
         .user-message {
-            background: #ff6b6b;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             margin-left: auto;
+            border-bottom-right-radius: 8px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
         
         .ai-message {
-            background: #e5e7eb;
-            color: #374151;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-bottom-left-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        
+        .ai-message .math-expression, .ai-message .MathJax {
+            background: white;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+            overflow-x: auto;
         }
         
         .chat-input-area {
             display: flex;
-            gap: 10px;
+            gap: 12px;
+            align-items: center;
         }
         
         .chat-input {
             flex: 1;
-            padding: 12px;
-            border: 2px solid #e5e7eb;
+            padding: 15px 20px;
+            border: 2px solid var(--border);
             border-radius: 25px;
             outline: none;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+            font-family: inherit;
+        }
+        
+        .chat-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
         .send-btn {
-            background: #ff6b6b;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             border: none;
             border-radius: 50%;
-            width: 45px;
-            height: 45px;
+            width: 50px;
+            height: 50px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
         
         .send-btn:hover {
-            background: #ee5a52;
-            transform: scale(1.1);
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
         }
         
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            padding: 30px;
-            background: #f1f5f9;
+        .send-btn:active {
+            transform: scale(0.95);
         }
         
-        .feature-card {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-            border-top: 4px solid #ff6b6b;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .feature-icon {
-            font-size: 2.5rem;
-            margin-bottom: 15px;
-        }
-        
+        /* Loading Animation */
         .loading {
             display: none;
             text-align: center;
-            padding: 20px;
+            padding: 40px;
         }
         
         .spinner {
-            border: 4px solid #f3f4f6;
-            border-top: 4px solid #ff6b6b;
+            border: 4px solid var(--bg-secondary);
+            border-top: 4px solid var(--primary);
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
+            margin: 0 auto 20px;
         }
         
         @keyframes spin {
@@ -389,210 +676,317 @@ HTML_TEMPLATE = """
             100% { transform: rotate(360deg); }
         }
         
+        /* Status Messages */
         .error {
-            background: #fee2e2;
-            color: #dc2626;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
+            background: linear-gradient(135deg, #fed7d7, #feb2b2);
+            color: var(--error-color);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin: 15px 0;
+            border-left: 5px solid var(--error-color);
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
         
         .success {
-            background: #dcfce7;
-            color: #16a34a;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 10px 0;
+            background: linear-gradient(135deg, #c6f6d5, #9ae6b4);
+            color: var(--success);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin: 15px 0;
+            border-left: 5px solid var(--success);
         }
         
-        .ny-ai-badge {
-            position: absolute;
-            top: 10px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: bold;
-        }
-        
+        /* Sequence Navigation */
         .sequence-nav {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             flex-wrap: wrap;
         }
         
         .sequence-btn {
-            padding: 8px 16px;
-            border: 2px solid #ff6b6b;
+            padding: 10px 18px;
+            border: 2px solid var(--primary);
             background: white;
-            color: #ff6b6b;
-            border-radius: 20px;
+            color: var(--primary);
+            border-radius: 25px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             font-size: 14px;
+            font-weight: 600;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .sequence-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transition: left 0.5s;
+        }
+        
+        .sequence-btn:hover::before {
+            left: 100%;
         }
         
         .sequence-btn.active, .sequence-btn:hover {
-            background: #ff6b6b;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 25px;
+                padding: 30px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
         }
         
         @media (max-width: 768px) {
-            .main-content {
-                flex-direction: column;
+            .header {
+                padding: 40px 20px;
             }
+            
             .header h1 {
-                font-size: 2rem;
+                font-size: 2.2rem;
             }
+            
+            .ny-ai-logo {
+                font-size: 2.5rem;
+            }
+            
+            .ny-ai-badge {
+                position: static;
+                display: inline-block;
+                margin-bottom: 20px;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .input-section, .solution-area, .chat-area {
+                padding: 20px;
+            }
+            
+            .tab-buttons {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .sequence-nav {
+                gap: 8px;
+            }
+            
+            .chat-area {
+                height: 400px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 30px 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
             .ny-ai-logo {
                 font-size: 2rem;
             }
+            
+            .main-content {
+                padding: 15px;
+                gap: 20px;
+            }
+            
+            .message {
+                max-width: 95%;
+                padding: 12px 16px;
+            }
+            
+            .solution-step {
+                padding: 20px;
+            }
+            
+            .step-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+        }
+        
+        /* Custom scrollbar for webkit browsers */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) var(--bg-secondary);
+        }
+        
+        *::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        
+        *::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+        
+        *::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+        
+        *::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
         }
     </style>
 </head>
 <body>
-    <div class="main-wrapper">
-        <div class="header">
-            <div class="ny-ai-badge">Powered by NY AI</div>
-            <div class="ny-ai-logo">🧠 NY AI</div>
-            <h1>Advanced JEE Question Solver</h1>
-            <p>Next-Gen AI with OCR, MathJax Rendering & Sequential Solutions</p>
-        </div>
-        
-        <div class="features">
-            <div class="feature-card">
-                <div class="feature-icon">📸</div>
-                <h3>Image Analysis</h3>
-                <p>Advanced OCR with formula recognition</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🔗</div>
-                <h3>URL Support</h3>
-                <p>Direct image URL processing</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">📊</div>
-                <h3>Sequential Solutions</h3>
-                <p>Step-by-step organized approach</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🔬</div>
-                <h3>MathJax Rendering</h3>
-                <p>Beautiful mathematical expressions</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">💬</div>
-                <h3>Interactive Chat</h3>
-                <p>Ask follow-up questions</p>
-            </div>
-        </div>
-        
-        <div class="main-content">
-            <div class="left-panel">
-                <div class="input-section">
-                    <h3>📤 Input Question</h3>
-                    
-                    <div class="tab-buttons">
-                        <button class="tab-btn active" onclick="switchTab('image')">📷 Image</button>
-                        <button class="tab-btn" onclick="switchTab('url')">🔗 URL</button>
-                    </div>
-                    
-                    <form method="POST" enctype="multipart/form-data" id="questionForm">
-                        <div id="image-tab" class="tab-content active">
-                            <div class="file-upload" onclick="document.getElementById('imageFile').click()">
-                                <div>📁 Click to upload or drag & drop image</div>
-                                <small>Supports JPG, PNG, GIF, WebP</small>
-                                <input type="file" id="imageFile" name="image_file" accept="image/*" style="display: none;" onchange="previewImage(this)">
-                            </div>
-                        </div>
-                        
-                        <div id="url-tab" class="tab-content">
-                            <input type="url" name="image_url" placeholder="🔗 Paste image URL here..." value="{{ image_url or '' }}">
-                        </div>
-                        
-                        <button type="submit" class="solve-btn" id="solveBtn">
-                            🧠 Analyze & Solve with NY AI
-                        </button>
-                    </form>
-                </div>
-                
-                {% if image_url %}
-                <div class="input-section">
-                    <h3>🖼️ Input Image</h3>
-                    <img src="{{ image_url }}" class="image-preview" alt="Question Image">
-                </div>
-                {% endif %}
-                
-                {% if extracted_text %}
-                <div class="input-section">
-                    <h3>📄 Extracted Text</h3>
-                    <div style="background: white; padding: 15px; border-radius: 10px; border-left: 4px solid #ff6b6b;">
-                        <pre style="white-space: pre-wrap; font-family: inherit;">{{ extracted_text }}</pre>
-                    </div>
-                </div>
-                {% endif %}
+    <div class="container">
+        <div class="main-wrapper">
+            <div class="header">
+                <div class="ny-ai-badge">Powered by NY AI</div>
+                <div class="ny-ai-logo">🧠 NY AI</div>
+                <h1>Advanced JEE Question Solver</h1>
+                <p>Next-Gen AI with OCR, MathJax Rendering & Sequential Solutions</p>
             </div>
             
-            <div class="right-panel">
-                <div class="solution-area">
-                    <h3>✅ Sequential Solution by NY AI</h3>
-                    
-                    {% if solution_sequence %}
-                    <div class="sequence-nav">
-                        {% for i in range(solution_sequence|length) %}
-                        <button class="sequence-btn {% if i == 0 %}active{% endif %}" onclick="showStep({{ i }})">
-                            Step {{ i + 1 }}
-                        </button>
-                        {% endfor %}
-                    </div>
-                    
-                    <div class="solution-sequence">
-                        {% for step in solution_sequence %}
-                        <div class="solution-step" id="step-{{ loop.index0 }}" {% if loop.index0 != 0 %}style="display: none;"{% endif %}>
-                            <div class="step-header">
-                                <div class="step-number">{{ loop.index }}</div>
-                                <div>{{ step.title }}</div>
-                            </div>
-                            <div class="step-content">
-                                {{ step.content|safe }}
-                            </div>
+            <div class="main-content">
+                <div class="left-panel">
+                    <div class="input-section">
+                        <h3>📤 Input Question</h3>
+                        
+                        <div class="tab-buttons">
+                            <button class="tab-btn active" onclick="switchTab('image')">📷 Image</button>
+                            <button class="tab-btn" onclick="switchTab('url')">🔗 URL</button>
                         </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <div class="loading" id="loading">
-                        <div class="spinner"></div>
-                        <p>NY AI is analyzing your question...</p>
+                        
+                        <form method="POST" enctype="multipart/form-data" id="questionForm">
+                            <div id="image-tab" class="tab-content active">
+                                <div class="file-upload" onclick="document.getElementById('imageFile').click()">
+                                    <div>📁 Click to upload or drag & drop image</div>
+                                    <small>Supports JPG, PNG, GIF, WebP</small>
+                                    <input type="file" id="imageFile" name="image_file" accept="image/*" style="display: none;" onchange="previewImage(this)">
+                                </div>
+                            </div>
+                            
+                            <div id="url-tab" class="tab-content">
+                                <input type="url" name="image_url" placeholder="🔗 Paste image URL here..." value="{{ image_url or '' }}">
+                            </div>
+                            
+                            <button type="submit" class="solve-btn" id="solveBtn">
+                                🧠 Analyze & Solve with NY AI
+                            </button>
+                        </form>
                     </div>
                     
-                    {% if not solution %}
-                    <div style="text-align: center; color: #9ca3af; padding: 40px;">
-                        <div style="font-size: 3rem; margin-bottom: 15px;">🤖</div>
-                        <p>Upload an image or provide a URL to get started with NY AI!</p>
+                    {% if image_url %}
+                    <div class="input-section">
+                        <h3>🖼️ Input Image</h3>
+                        <img src="{{ image_url }}" class="image-preview" alt="Question Image">
                     </div>
                     {% endif %}
-                    {% endif %}
                     
-                    {% if error %}
-                    <div class="error">{{ error }}</div>
+                    {% if extracted_text %}
+                    <div class="input-section">
+                        <h3>📄 Extracted Text</h3>
+                        <div style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid var(--accent);">
+                            <pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.6;">{{ extracted_text }}</pre>
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
                 
-                <div class="chat-area">
-                    <h3>💬 Chat with NY AI</h3>
-                    <div class="chat-messages" id="chatMessages">
-                        {% for message in chat_history %}
-                        <div class="message {{ 'user-message' if message.role == 'user' else 'ai-message' }}">
-                            {{ message.content|safe }}
+                <div class="right-panel">
+                    <div class="solution-area">
+                        <h3>✅ Sequential Solution by NY AI</h3>
+                        
+                        {% if solution_sequence %}
+                        <div class="sequence-nav">
+                            {% for i in range(solution_sequence|length) %}
+                            <button class="sequence-btn {% if i == 0 %}active{% endif %}" onclick="showStep({{ i }})">
+                                Step {{ i + 1 }}
+                            </button>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
+                        
+                        <div class="solution-sequence">
+                            {% for step in solution_sequence %}
+                            <div class="solution-step" id="step-{{ loop.index0 }}" {% if loop.index0 != 0 %}style="display: none;"{% endif %}>
+                                <div class="step-header">
+                                    <div class="step-number">{{ loop.index }}</div>
+                                    <div>{{ step.title }}</div>
+                                </div>
+                                <div class="step-content">
+                                    {{ step.content|safe }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="loading" id="loading">
+                            <div class="spinner"></div>
+                            <p>NY AI is analyzing your question...</p>
+                        </div>
+                        
+                        {% if not solution %}
+                        <div style="text-align: center; color: var(--text-light); padding: 60px 20px;">
+                            <div style="font-size: 4rem; margin-bottom: 20px; opacity: 0.7;">🤖</div>
+                            <h3 style="margin-bottom: 10px; color: var(--text-secondary);">Ready to Solve!</h3>
+                            <p>Upload an image or provide a URL to get started with NY AI's advanced problem-solving capabilities.</p>
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                        
+                        {% if error %}
+                        <div class="error">{{ error }}</div>
+                        {% endif %}
                     </div>
                     
-                    <div class="chat-input-area">
-                        <input type="text" class="chat-input" id="chatInput" placeholder="Ask follow-up questions to NY AI..." onkeypress="handleChatKeyPress(event)">
-                        <button class="send-btn" onclick="sendChatMessage()">➤</button>
+                    <div class="chat-area">
+                        <h3>💬 Chat with NY AI</h3>
+                        <div class="chat-messages" id="chatMessages">
+                            {% for message in chat_history %}
+                            <div class="message {{ 'user-message' if message.role == 'user' else 'ai-message' }}">
+                                {{ message.content|safe }}
+                            </div>
+                            {% endfor %}
+                            
+                            {% if not chat_history %}
+                            <div style="text-align: center; color: var(--text-light); padding: 40px 20px;">
+                                <div style="font-size: 2.5rem; margin-bottom: 15px; opacity: 0.6;">💭</div>
+                                <p>Ask me anything about the solution or related concepts!</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="chat-input-area">
+                            <input type="text" class="chat-input" id="chatInput" placeholder="Ask follow-up questions to NY AI..." onkeypress="handleChatKeyPress(event)">
+                            <button class="send-btn" onclick="sendChatMessage()">➤</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -600,10 +994,15 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
+        // Enhanced tab switching with animations
         function switchTab(tabName) {
-            // Hide all tab contents
+            // Hide all tab contents with fade out
             document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
+                tab.style.opacity = '0';
+                tab.style.transform = 'translateY(10px)';
+                setTimeout(() => {
+                    tab.classList.remove('active');
+                }, 150);
             });
             
             // Remove active class from all buttons
@@ -611,15 +1010,25 @@ HTML_TEMPLATE = """
                 btn.classList.remove('active');
             });
             
-            // Show selected tab
-            document.getElementById(tabName + '-tab').classList.add('active');
-            event.target.classList.add('active');
+            // Show selected tab with fade in
+            setTimeout(() => {
+                const targetTab = document.getElementById(tabName + '-tab');
+                targetTab.classList.add('active');
+                targetTab.style.opacity = '1';
+                targetTab.style.transform = 'translateY(0)';
+                event.target.classList.add('active');
+            }, 150);
         }
         
+        // Enhanced step navigation
         function showStep(stepIndex) {
-            // Hide all steps
-            document.querySelectorAll('.solution-step').forEach(step => {
-                step.style.display = 'none';
+            // Hide all steps with smooth transition
+            document.querySelectorAll('.solution-step').forEach((step, index) => {
+                step.style.opacity = '0';
+                step.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    step.style.display = 'none';
+                }, 200);
             });
             
             // Remove active from all sequence buttons
@@ -627,67 +1036,143 @@ HTML_TEMPLATE = """
                 btn.classList.remove('active');
             });
             
-            // Show selected step
-            document.getElementById('step-' + stepIndex).style.display = 'block';
-            event.target.classList.add('active');
-            
-            // Re-render MathJax for the visible step
-            if (window.MathJax) {
-                MathJax.typesetPromise([document.getElementById('step-' + stepIndex)]);
-            }
+            // Show selected step with animation
+            setTimeout(() => {
+                const targetStep = document.getElementById('step-' + stepIndex);
+                targetStep.style.display = 'block';
+                setTimeout(() => {
+                    targetStep.style.opacity = '1';
+                    targetStep.style.transform = 'translateY(0)';
+                }, 50);
+                
+                event.target.classList.add('active');
+                
+                // Re-render MathJax for the visible step
+                if (window.MathJax) {
+                    MathJax.typesetPromise([targetStep]).then(() => {
+                        // Ensure math expressions are properly sized for small screens
+                        targetStep.querySelectorAll('.MathJax').forEach(math => {
+                            math.style.overflowX = 'auto';
+                            math.style.maxWidth = '100%';
+                        });
+                    });
+                }
+            }, 200);
         }
         
+        // Enhanced image preview with animation
         function previewImage(input) {
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    // Create preview if it doesn't exist
-                    let preview = document.getElementById('imagePreview');
-                    if (!preview) {
-                        preview = document.createElement('img');
-                        preview.id = 'imagePreview';
-                        preview.className = 'image-preview';
-                        input.parentNode.appendChild(preview);
+                    // Remove existing preview
+                    const existingPreview = document.getElementById('imagePreview');
+                    if (existingPreview) {
+                        existingPreview.remove();
                     }
+                    
+                    // Create new preview with animation
+                    const preview = document.createElement('img');
+                    preview.id = 'imagePreview';
+                    preview.className = 'image-preview';
                     preview.src = e.target.result;
+                    preview.style.opacity = '0';
+                    preview.style.transform = 'scale(0.9)';
+                    
+                    input.parentNode.appendChild(preview);
+                    
+                    // Animate in
+                    setTimeout(() => {
+                        preview.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                        preview.style.opacity = '1';
+                        preview.style.transform = 'scale(1)';
+                    }, 50);
                 }
                 reader.readAsDataURL(input.files[0]);
             }
         }
         
-        // Drag and drop functionality
+        // Enhanced drag and drop with better visual feedback
         const fileUpload = document.querySelector('.file-upload');
+        let dragCounter = 0;
         
-        fileUpload.addEventListener('dragover', (e) => {
+        fileUpload.addEventListener('dragenter', (e) => {
             e.preventDefault();
+            dragCounter++;
             fileUpload.classList.add('drag-over');
         });
         
-        fileUpload.addEventListener('dragleave', () => {
-            fileUpload.classList.remove('drag-over');
+        fileUpload.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0) {
+                fileUpload.classList.remove('drag-over');
+            }
+        });
+        
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
         });
         
         fileUpload.addEventListener('drop', (e) => {
             e.preventDefault();
+            dragCounter = 0;
             fileUpload.classList.remove('drag-over');
             
             const files = e.dataTransfer.files;
             if (files.length > 0) {
-                document.getElementById('imageFile').files = files;
-                previewImage(document.getElementById('imageFile'));
+                const fileInput = document.getElementById('imageFile');
+                fileInput.files = files;
+                previewImage(fileInput);
+                
+                // Visual feedback for successful drop
+                fileUpload.style.background = 'rgba(72, 187, 120, 0.1)';
+                fileUpload.style.borderColor = 'var(--success)';
+                setTimeout(() => {
+                    fileUpload.style.background = '';
+                    fileUpload.style.borderColor = '';
+                }, 1000);
             }
         });
         
-        // Form submission with loading
-        document.getElementById('questionForm').addEventListener('submit', function() {
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('solveBtn').disabled = true;
-            document.getElementById('solveBtn').textContent = 'NY AI Analyzing...';
+        // Enhanced form submission with better loading states
+        document.getElementById('questionForm').addEventListener('submit', function(e) {
+            const solveBtn = document.getElementById('solveBtn');
+            const loading = document.getElementById('loading');
+            
+            // Show loading state
+            if (loading) {
+                loading.style.display = 'block';
+                loading.style.opacity = '0';
+                setTimeout(() => {
+                    loading.style.transition = 'opacity 0.3s ease';
+                    loading.style.opacity = '1';
+                }, 50);
+            }
+            
+            // Disable and animate button
+            solveBtn.disabled = true;
+            solveBtn.innerHTML = '🔄 NY AI Analyzing...';
+            solveBtn.style.transform = 'scale(0.98)';
+            
+            // Add pulsing animation to button
+            solveBtn.style.animation = 'pulse 2s infinite';
         });
         
-        // Chat functionality
+        // Add pulse animation for loading button
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Enhanced chat functionality
         function handleChatKeyPress(event) {
-            if (event.key === 'Enter') {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
                 sendChatMessage();
             }
         }
@@ -698,9 +1183,12 @@ HTML_TEMPLATE = """
             
             if (!message) return;
             
-            // Add user message to chat
+            // Add user message with animation
             addMessageToChat(message, 'user');
             input.value = '';
+            
+            // Show typing indicator
+            showTypingIndicator();
             
             // Send to server
             fetch('/chat', {
@@ -714,6 +1202,7 @@ HTML_TEMPLATE = """
             })
             .then(response => response.json())
             .then(data => {
+                hideTypingIndicator();
                 if (data.response) {
                     addMessageToChat(data.response, 'ai');
                 } else if (data.error) {
@@ -721,30 +1210,179 @@ HTML_TEMPLATE = """
                 }
             })
             .catch(error => {
+                hideTypingIndicator();
                 addMessageToChat('Error: ' + error.message, 'ai');
             });
         }
         
         function addMessageToChat(message, role) {
             const chatMessages = document.getElementById('chatMessages');
+            
+            // Remove empty state if present
+            const emptyState = chatMessages.querySelector('[style*="text-align: center"]');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}-message`;
             messageDiv.innerHTML = message;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translateY(20px) scale(0.95)';
             
-            // Re-render MathJax for new messages
+            chatMessages.appendChild(messageDiv);
+            
+            // Animate message in
+            setTimeout(() => {
+                messageDiv.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                messageDiv.style.opacity = '1';
+                messageDiv.style.transform = 'translateY(0) scale(1)';
+            }, 50);
+            
+            // Smooth scroll to bottom
+            setTimeout(() => {
+                chatMessages.scrollTo({
+                    top: chatMessages.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 100);
+            
+            // Re-render MathJax for new messages with proper overflow handling
             if (window.MathJax) {
-                MathJax.typesetPromise([messageDiv]);
+                MathJax.typesetPromise([messageDiv]).then(() => {
+                    messageDiv.querySelectorAll('.MathJax').forEach(math => {
+                        math.style.overflowX = 'auto';
+                        math.style.maxWidth = '100%';
+                    });
+                });
             }
         }
         
-        // Initialize MathJax rendering on page load
+        function showTypingIndicator() {
+            const chatMessages = document.getElementById('chatMessages');
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typing-indicator';
+            typingDiv.className = 'message ai-message';
+            typingDiv.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="display: flex; gap: 4px;">
+                        <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: typing 1.4s infinite ease-in-out;"></div>
+                        <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: typing 1.4s infinite ease-in-out 0.2s;"></div>
+                        <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: typing 1.4s infinite ease-in-out 0.4s;"></div>
+                    </div>
+                    <span style="color: var(--text-light); font-size: 0.9rem;">NY AI is thinking...</span>
+                </div>
+            `;
+            
+            // Add typing animation
+            const typingStyle = document.createElement('style');
+            typingStyle.textContent = `
+                @keyframes typing {
+                    0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+                    30% { opacity: 1; transform: scale(1); }
+                }
+            `;
+            document.head.appendChild(typingStyle);
+            
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTo({
+                top: chatMessages.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+        
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.style.opacity = '0';
+                typingIndicator.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    typingIndicator.remove();
+                }, 300);
+            }
+        }
+        
+        // Initialize MathJax rendering with proper overflow handling
         document.addEventListener('DOMContentLoaded', function() {
+            // Set up initial tab transitions
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            });
+            
+            // Set up solution steps transitions
+            document.querySelectorAll('.solution-step').forEach(step => {
+                step.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            });
+            
+            // Initialize MathJax with proper configuration for mobile
             if (window.MathJax) {
-                MathJax.typesetPromise();
+                MathJax.typesetPromise().then(() => {
+                    // Ensure all math expressions handle overflow properly
+                    document.querySelectorAll('.MathJax').forEach(math => {
+                        math.style.overflowX = 'auto';
+                        math.style.maxWidth = '100%';
+                    });
+                });
+                
+                // Configure MathJax for dynamic content
+                MathJax.config.tex.inlineMath = [['$', '$'], ['\\(', '\\)']];
+                MathJax.config.tex.displayMath = [['$$', '$$'], ['\\[', '\\]']];
+            }
+            
+            // Add smooth scrolling to all internal links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+        });
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl/Cmd + Enter to submit form
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                const form = document.getElementById('questionForm');
+                if (form) {
+                    form.dispatchEvent(new Event('submit'));
+                }
+            }
+            
+            // Escape to clear chat input
+            if (e.key === 'Escape') {
+                const chatInput = document.getElementById('chatInput');
+                if (chatInput && document.activeElement === chatInput) {
+                    chatInput.value = '';
+                    chatInput.blur();
+                }
             }
         });
+        
+        // Performance optimization: Lazy load images
+        if ('IntersectionObserver' in window) {
+            const imageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                            observer.unobserve(img);
+                        }
+                    }
+                });
+            });
+            
+            document.querySelectorAll('img[data-src]').forEach(img => {
+                imageObserver.observe(img);
+            });
+        }
     </script>
 </body>
 </html>

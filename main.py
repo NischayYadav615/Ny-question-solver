@@ -413,7 +413,7 @@ HTML_TEMPLATE = """
             transform: scale(1.02);
         }
         
-        /* Enhanced Solution Area */
+        /* Enhanced Solution Area - Fixed Width Structure */
         .solution-area {
             background: var(--bg-primary);
             border-radius: var(--radius);
@@ -421,8 +421,10 @@ HTML_TEMPLATE = """
             position: relative;
             overflow: hidden;
             min-height: 600px;
+            max-height: 800px;
             display: flex;
             flex-direction: column;
+            width: 100%;
         }
         
         .solution-header {
@@ -431,11 +433,13 @@ HTML_TEMPLATE = """
             color: white;
             display: flex;
             align-items: center;
-            justify-content: between;
+            justify-content: space-between;
             gap: 15px;
             position: sticky;
             top: 0;
             z-index: 10;
+            flex-shrink: 0;
+            min-height: 80px;
         }
         
         .solution-header h3 {
@@ -443,12 +447,17 @@ HTML_TEMPLATE = """
             font-weight: 600;
             margin: 0;
             flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         
         .solution-controls {
             display: flex;
             align-items: center;
             gap: 15px;
+            flex-shrink: 0;
         }
         
         .fullscreen-btn, .zoom-btn {
@@ -461,6 +470,7 @@ HTML_TEMPLATE = """
             transition: all 0.3s ease;
             font-size: 16px;
             backdrop-filter: blur(10px);
+            flex-shrink: 0;
         }
         
         .fullscreen-btn:hover, .zoom-btn:hover {
@@ -474,33 +484,45 @@ HTML_TEMPLATE = """
             overflow-x: hidden;
             padding: 30px;
             scroll-behavior: smooth;
+            position: relative;
+            height: calc(100% - 80px);
+            min-height: 0;
         }
         
-        /* Custom scrollbar for solution content */
+        /* Enhanced scrollbar with better visibility */
         .solution-content::-webkit-scrollbar {
-            width: 12px;
+            width: 14px;
         }
         
         .solution-content::-webkit-scrollbar-track {
             background: var(--bg-secondary);
-            border-radius: 6px;
-            margin: 10px 0;
+            border-radius: 7px;
+            margin: 5px 0;
+            border: 1px solid var(--border);
         }
         
         .solution-content::-webkit-scrollbar-thumb {
             background: linear-gradient(135deg, var(--primary), var(--accent));
-            border-radius: 6px;
+            border-radius: 7px;
             border: 2px solid var(--bg-secondary);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
         }
         
         .solution-content::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(135deg, var(--primary-dark), var(--accent));
+            box-shadow: inset 0 1px 5px rgba(0,0,0,0.2);
+        }
+        
+        .solution-content::-webkit-scrollbar-thumb:active {
+            background: linear-gradient(135deg, var(--accent), var(--primary));
         }
         
         .solution-sequence {
             display: flex;
             flex-direction: column;
             gap: 25px;
+            width: 100%;
+            min-width: 0;
         }
         
         .solution-step {
@@ -513,7 +535,11 @@ HTML_TEMPLATE = """
             transform: translateY(30px);
             animation: slideInStep 0.6s ease forwards;
             position: relative;
-            overflow: visible;
+            overflow: hidden;
+            word-wrap: break-word;
+            width: 100%;
+            box-sizing: border-box;
+            max-width: 100%;
         }
         
         .solution-step:nth-child(1) { animation-delay: 0.1s; }
@@ -538,6 +564,7 @@ HTML_TEMPLATE = """
             font-weight: 700;
             color: var(--text-primary);
             font-size: 1.1rem;
+            flex-wrap: wrap;
         }
         
         .step-number {
@@ -555,18 +582,34 @@ HTML_TEMPLATE = """
             flex-shrink: 0;
         }
         
+        .step-title {
+            flex: 1;
+            min-width: 0;
+            word-break: break-word;
+        }
+        
         .step-content {
             line-height: 1.8;
             color: var(--text-secondary);
             word-break: break-word;
-            overflow: visible;
+            overflow-wrap: break-word;
+            hyphens: auto;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         
-        /* Enhanced Math expressions with better mobile handling */
-        .math-expression, .MathJax, .MathJax_Display {
+        .step-content * {
             max-width: 100%;
-            overflow-x: auto;
-            overflow-y: hidden;
+            box-sizing: border-box;
+        }
+        
+        /* Enhanced Math expressions with better containment */
+        .math-expression, .MathJax, .MathJax_Display {
+            max-width: 100% !important;
+            width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
             padding: 15px;
             background: var(--bg-secondary);
             border-radius: 10px;
@@ -575,6 +618,8 @@ HTML_TEMPLATE = """
             font-family: 'Courier New', monospace;
             white-space: nowrap;
             scroll-behavior: smooth;
+            box-sizing: border-box;
+            -webkit-overflow-scrolling: touch;
         }
         
         .MathJax_Display {
@@ -584,20 +629,73 @@ HTML_TEMPLATE = """
             border-radius: 12px !important;
             border-left: 4px solid var(--primary) !important;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05) !important;
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
         }
         
         .MathJax_Display::-webkit-scrollbar {
-            height: 8px;
+            height: 10px;
         }
         
         .MathJax_Display::-webkit-scrollbar-track {
             background: rgba(102, 126, 234, 0.1);
-            border-radius: 4px;
+            border-radius: 5px;
         }
         
         .MathJax_Display::-webkit-scrollbar-thumb {
             background: var(--primary);
+            border-radius: 5px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+        
+        .MathJax_Display::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
+        }
+        
+        /* Text content overflow handling */
+        .step-content p, .step-content div, .step-content span {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+        }
+        
+        .step-content pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-x: auto;
+            max-width: 100%;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .step-content code {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            padding: 2px 6px;
+            background: var(--bg-secondary);
             border-radius: 4px;
+            font-size: 0.9em;
+        }
+        
+        .step-content table {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+            display: block;
+            white-space: nowrap;
+        }
+        
+        .step-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 10px 0;
         }
         
         .final-answer {
@@ -698,7 +796,7 @@ HTML_TEMPLATE = """
             border: 3px solid var(--bg-secondary);
         }
         
-        /* Enhanced Sequence Navigation */
+        /* Enhanced Sequence Navigation - Fixed Position */
         .sequence-nav {
             display: flex;
             gap: 10px;
@@ -710,6 +808,24 @@ HTML_TEMPLATE = """
             padding: 15px 0;
             z-index: 5;
             border-bottom: 2px solid var(--border);
+            width: 100%;
+            box-sizing: border-box;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .sequence-nav::-webkit-scrollbar {
+            height: 6px;
+        }
+        
+        .sequence-nav::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 3px;
+        }
+        
+        .sequence-nav::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
         }
         
         .sequence-btn {
@@ -725,6 +841,9 @@ HTML_TEMPLATE = """
             position: relative;
             overflow: hidden;
             white-space: nowrap;
+            flex-shrink: 0;
+            min-width: 100px;
+            text-align: center;
         }
         
         .sequence-btn::before {
@@ -1305,7 +1424,7 @@ HTML_TEMPLATE = """
                                 <div class="solution-step" id="step-{{ loop.index0 }}" {% if loop.index0 != 0 %}style="display: none;"{% endif %}>
                                     <div class="step-header">
                                         <div class="step-number">{{ loop.index }}</div>
-                                        <div>{{ step.title }}</div>
+                                        <div class="step-title">{{ step.title }}</div>
                                     </div>
                                     <div class="step-content">
                                         {{ step.content|safe }}

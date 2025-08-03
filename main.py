@@ -37,6 +37,13 @@ HTML_TEMPLATE = """
                 skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
                 ignoreHtmlClass: 'tex2jax_ignore',
                 processHtmlClass: 'tex2jax_process'
+            },
+            startup: {
+                pageReady: () => {
+                    return MathJax.startup.defaultPageReady().then(() => {
+                        adjustMathJaxForMobile();
+                    });
+                }
             }
         };
     </script>
@@ -166,6 +173,7 @@ HTML_TEMPLATE = """
             gap: 30px; 
             padding: 40px;
             min-height: 600px;
+            position: relative;
         }
         
         .left-panel, .right-panel {
@@ -405,21 +413,88 @@ HTML_TEMPLATE = """
             transform: scale(1.02);
         }
         
-        /* Solution Area */
+        /* Enhanced Solution Area */
         .solution-area {
             background: var(--bg-primary);
             border-radius: var(--radius);
-            padding: 30px;
-            min-height: 400px;
+            padding: 0;
             position: relative;
             overflow: hidden;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
         }
         
-        .solution-area h3 {
+        .solution-header {
+            padding: 25px 30px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: between;
+            gap: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .solution-header h3 {
             font-size: 1.4rem;
             font-weight: 600;
-            margin-bottom: 25px;
-            color: var(--text-primary);
+            margin: 0;
+            flex: 1;
+        }
+        
+        .solution-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .fullscreen-btn, .zoom-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .fullscreen-btn:hover, .zoom-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+        
+        .solution-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 30px;
+            scroll-behavior: smooth;
+        }
+        
+        /* Custom scrollbar for solution content */
+        .solution-content::-webkit-scrollbar {
+            width: 12px;
+        }
+        
+        .solution-content::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        
+        .solution-content::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 6px;
+            border: 2px solid var(--bg-secondary);
+        }
+        
+        .solution-content::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, var(--primary-dark), var(--accent));
         }
         
         .solution-sequence {
@@ -438,7 +513,7 @@ HTML_TEMPLATE = """
             transform: translateY(30px);
             animation: slideInStep 0.6s ease forwards;
             position: relative;
-            overflow-x: auto;
+            overflow: visible;
         }
         
         .solution-step:nth-child(1) { animation-delay: 0.1s; }
@@ -477,17 +552,18 @@ HTML_TEMPLATE = """
             font-size: 16px;
             font-weight: 700;
             box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+            flex-shrink: 0;
         }
         
         .step-content {
             line-height: 1.8;
             color: var(--text-secondary);
-            overflow-x: auto;
             word-break: break-word;
+            overflow: visible;
         }
         
-        /* Math expressions with horizontal scroll */
-        .math-expression, .MathJax {
+        /* Enhanced Math expressions with better mobile handling */
+        .math-expression, .MathJax, .MathJax_Display {
             max-width: 100%;
             overflow-x: auto;
             overflow-y: hidden;
@@ -497,11 +573,31 @@ HTML_TEMPLATE = """
             margin: 15px 0;
             border-left: 4px solid var(--accent-light);
             font-family: 'Courier New', monospace;
+            white-space: nowrap;
+            scroll-behavior: smooth;
         }
         
         .MathJax_Display {
-            overflow-x: auto !important;
-            overflow-y: hidden !important;
+            padding: 20px !important;
+            margin: 20px 0 !important;
+            background: var(--bg-secondary) !important;
+            border-radius: 12px !important;
+            border-left: 4px solid var(--primary) !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05) !important;
+        }
+        
+        .MathJax_Display::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .MathJax_Display::-webkit-scrollbar-track {
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 4px;
+        }
+        
+        .MathJax_Display::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
         }
         
         .final-answer {
@@ -514,6 +610,143 @@ HTML_TEMPLATE = """
             font-weight: 700;
             margin-top: 25px;
             box-shadow: 0 8px 25px rgba(72, 187, 120, 0.3);
+        }
+        
+        /* Fullscreen Solution Modal */
+        .fullscreen-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+        
+        .fullscreen-modal.active {
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .fullscreen-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1001;
+        }
+        
+        .fullscreen-header h3 {
+            font-size: 1.6rem;
+            margin: 0;
+        }
+        
+        .fullscreen-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .close-fullscreen {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+        }
+        
+        .close-fullscreen:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+        
+        .fullscreen-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 40px;
+            background: var(--bg-primary);
+            scroll-behavior: smooth;
+        }
+        
+        .fullscreen-content::-webkit-scrollbar {
+            width: 16px;
+        }
+        
+        .fullscreen-content::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+        
+        .fullscreen-content::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 8px;
+            border: 3px solid var(--bg-secondary);
+        }
+        
+        /* Enhanced Sequence Navigation */
+        .sequence-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            background: var(--bg-primary);
+            padding: 15px 0;
+            z-index: 5;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .sequence-btn {
+            padding: 12px 20px;
+            border: 2px solid var(--primary);
+            background: white;
+            color: var(--primary);
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 14px;
+            font-weight: 600;
+            position: relative;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        
+        .sequence-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transition: left 0.5s;
+        }
+        
+        .sequence-btn:hover::before {
+            left: 100%;
+        }
+        
+        .sequence-btn.active, .sequence-btn:hover {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
         }
         
         /* Chat Area */
@@ -547,17 +780,17 @@ HTML_TEMPLATE = """
         }
         
         .chat-messages::-webkit-scrollbar {
-            width: 6px;
+            width: 8px;
         }
         
         .chat-messages::-webkit-scrollbar-track {
             background: var(--bg-secondary);
-            border-radius: 3px;
+            border-radius: 4px;
         }
         
         .chat-messages::-webkit-scrollbar-thumb {
             background: var(--primary);
-            border-radius: 3px;
+            border-radius: 4px;
         }
         
         .message {
@@ -702,48 +935,124 @@ HTML_TEMPLATE = """
             border-left: 5px solid var(--success);
         }
         
-        /* Sequence Navigation */
-        .sequence-nav {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-        }
-        
-        .sequence-btn {
-            padding: 10px 18px;
-            border: 2px solid var(--primary);
-            background: white;
-            color: var(--primary);
-            border-radius: 25px;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            font-size: 14px;
-            font-weight: 600;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .sequence-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
-            transition: left 0.5s;
-        }
-        
-        .sequence-btn:hover::before {
-            left: 100%;
-        }
-        
-        .sequence-btn.active, .sequence-btn:hover {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        /* Scroll to Top Button */
+        .scroll-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, var(--accent), var(--primary));
             color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+            border: none;
+            border-radius: 50%;
+            width: 55px;
+            height: 55px;
+            cursor: pointer;
+            font-size: 20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+        }
+        
+        .scroll-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .scroll-to-top:hover {
+            transform: scale(1.1) translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.5);
+        }
+        
+        /* Solution Navigation Dots */
+        .solution-nav-dots {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .solution-nav-dots.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .nav-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(102, 126, 234, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-dot:hover, .nav-dot.active {
+            background: var(--primary);
+            transform: scale(1.3);
+        }
+        
+        .nav-dot::after {
+            content: attr(data-step);
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--text-primary);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-dot:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Zoom Controls */
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .zoom-btn {
+            background: transparent !important;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .zoom-level {
+            color: white;
+            font-size: 14px;
+            min-width: 50px;
+            text-align: center;
         }
         
         /* Responsive Design */
@@ -756,6 +1065,10 @@ HTML_TEMPLATE = """
             
             .container {
                 padding: 15px;
+            }
+            
+            .solution-nav-dots {
+                display: none;
             }
         }
         
@@ -786,6 +1099,10 @@ HTML_TEMPLATE = """
                 padding: 20px;
             }
             
+            .solution-content {
+                padding: 20px;
+            }
+            
             .tab-buttons {
                 flex-direction: column;
                 gap: 8px;
@@ -793,10 +1110,40 @@ HTML_TEMPLATE = """
             
             .sequence-nav {
                 gap: 8px;
+                padding: 10px 0;
+            }
+            
+            .sequence-btn {
+                padding: 10px 16px;
+                font-size: 13px;
             }
             
             .chat-area {
                 height: 400px;
+            }
+            
+            .solution-header {
+                padding: 20px;
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .solution-controls {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .fullscreen-content {
+                padding: 20px;
+            }
+            
+            .scroll-to-top {
+                bottom: 20px;
+                right: 20px;
+                width: 50px;
+                height: 50px;
+                font-size: 18px;
             }
         }
         
@@ -835,6 +1182,15 @@ HTML_TEMPLATE = """
                 flex-direction: column;
                 text-align: center;
                 gap: 10px;
+            }
+            
+            .sequence-nav {
+                justify-content: center;
+            }
+            
+            .MathJax_Display {
+                padding: 15px !important;
+                font-size: 14px !important;
             }
         }
         
@@ -922,48 +1278,60 @@ HTML_TEMPLATE = """
                 
                 <div class="right-panel">
                     <div class="solution-area">
-                        <h3>✅ Sequential Solution by NY AI</h3>
-                        
-                        {% if solution_sequence %}
-                        <div class="sequence-nav">
-                            {% for i in range(solution_sequence|length) %}
-                            <button class="sequence-btn {% if i == 0 %}active{% endif %}" onclick="showStep({{ i }})">
-                                Step {{ i + 1 }}
-                            </button>
-                            {% endfor %}
-                        </div>
-                        
-                        <div class="solution-sequence">
-                            {% for step in solution_sequence %}
-                            <div class="solution-step" id="step-{{ loop.index0 }}" {% if loop.index0 != 0 %}style="display: none;"{% endif %}>
-                                <div class="step-header">
-                                    <div class="step-number">{{ loop.index }}</div>
-                                    <div>{{ step.title }}</div>
+                        <div class="solution-header">
+                            <h3>✅ Sequential Solution by NY AI</h3>
+                            <div class="solution-controls">
+                                <div class="zoom-controls">
+                                    <button class="zoom-btn" onclick="adjustZoom(-0.1)" title="Zoom Out">−</button>
+                                    <span class="zoom-level" id="zoomLevel">100%</span>
+                                    <button class="zoom-btn" onclick="adjustZoom(0.1)" title="Zoom In">+</button>
                                 </div>
-                                <div class="step-content">
-                                    {{ step.content|safe }}
-                                </div>
+                                <button class="fullscreen-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">⛶</button>
                             </div>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <div class="loading" id="loading">
-                            <div class="spinner"></div>
-                            <p>NY AI is analyzing your question...</p>
                         </div>
                         
-                        {% if not solution %}
-                        <div style="text-align: center; color: var(--text-light); padding: 60px 20px;">
-                            <div style="font-size: 4rem; margin-bottom: 20px; opacity: 0.7;">🤖</div>
-                            <h3 style="margin-bottom: 10px; color: var(--text-secondary);">Ready to Solve!</h3>
-                            <p>Upload an image or provide a URL to get started with NY AI's advanced problem-solving capabilities.</p>
+                        <div class="solution-content" id="solutionContent">
+                            {% if solution_sequence %}
+                            <div class="sequence-nav" id="sequenceNav">
+                                {% for i in range(solution_sequence|length) %}
+                                <button class="sequence-btn {% if i == 0 %}active{% endif %}" onclick="showStep({{ i }})">
+                                    Step {{ i + 1 }}
+                                </button>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="solution-sequence">
+                                {% for step in solution_sequence %}
+                                <div class="solution-step" id="step-{{ loop.index0 }}" {% if loop.index0 != 0 %}style="display: none;"{% endif %}>
+                                    <div class="step-header">
+                                        <div class="step-number">{{ loop.index }}</div>
+                                        <div>{{ step.title }}</div>
+                                    </div>
+                                    <div class="step-content">
+                                        {{ step.content|safe }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="loading" id="loading">
+                                <div class="spinner"></div>
+                                <p>NY AI is analyzing your question...</p>
+                            </div>
+                            
+                            {% if not solution %}
+                            <div style="text-align: center; color: var(--text-light); padding: 60px 20px;">
+                                <div style="font-size: 4rem; margin-bottom: 20px; opacity: 0.7;">🤖</div>
+                                <h3 style="margin-bottom: 10px; color: var(--text-secondary);">Ready to Solve!</h3>
+                                <p>Upload an image or provide a URL to get started with NY AI's advanced problem-solving capabilities.</p>
+                            </div>
+                            {% endif %}
+                            {% endif %}
+                            
+                            {% if error %}
+                            <div class="error">{{ error }}</div>
+                            {% endif %}
                         </div>
-                        {% endif %}
-                        {% endif %}
-                        
-                        {% if error %}
-                        <div class="error">{{ error }}</div>
-                        {% endif %}
                     </div>
                     
                     <div class="chat-area">
@@ -993,7 +1361,36 @@ HTML_TEMPLATE = """
         </div>
     </div>
 
+    <!-- Fullscreen Modal -->
+    <div class="fullscreen-modal" id="fullscreenModal">
+        <div class="fullscreen-header">
+            <h3>✅ Sequential Solution by NY AI - Full Screen</h3>
+            <div class="fullscreen-controls">
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="adjustFullscreenZoom(-0.1)" title="Zoom Out">−</button>
+                    <span class="zoom-level" id="fullscreenZoomLevel">100%</span>
+                    <button class="zoom-btn" onclick="adjustFullscreenZoom(0.1)" title="Zoom In">+</button>
+                </div>
+                <button class="close-fullscreen" onclick="toggleFullscreen()" title="Exit Fullscreen">✕</button>
+            </div>
+        </div>
+        <div class="fullscreen-content" id="fullscreenContent">
+            <!-- Content will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <!-- Scroll to Top Button -->
+    <button class="scroll-to-top" id="scrollToTop" onclick="scrollToTop()" title="Scroll to Top">↑</button>
+
+    <!-- Solution Navigation Dots -->
+    <div class="solution-nav-dots" id="solutionNavDots">
+        <!-- Dots will be dynamically generated -->
+    </div>
+
     <script>
+        let currentZoom = 1;
+        let fullscreenZoom = 1;
+        
         // Enhanced tab switching with animations
         function switchTab(tabName) {
             // Hide all tab contents with fade out
@@ -1020,7 +1417,7 @@ HTML_TEMPLATE = """
             }, 150);
         }
         
-        // Enhanced step navigation
+        // Enhanced step navigation with smooth scrolling
         function showStep(stepIndex) {
             // Hide all steps with smooth transition
             document.querySelectorAll('.solution-step').forEach((step, index) => {
@@ -1046,18 +1443,130 @@ HTML_TEMPLATE = """
                 }, 50);
                 
                 event.target.classList.add('active');
+                updateNavDots(stepIndex);
+                
+                // Smooth scroll to step
+                targetStep.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start',
+                    inline: 'nearest'
+                });
                 
                 // Re-render MathJax for the visible step
                 if (window.MathJax) {
                     MathJax.typesetPromise([targetStep]).then(() => {
-                        // Ensure math expressions are properly sized for small screens
-                        targetStep.querySelectorAll('.MathJax').forEach(math => {
-                            math.style.overflowX = 'auto';
-                            math.style.maxWidth = '100%';
-                        });
+                        adjustMathJaxForMobile();
                     });
                 }
             }, 200);
+        }
+        
+        // Fullscreen functionality
+        function toggleFullscreen() {
+            const modal = document.getElementById('fullscreenModal');
+            const isActive = modal.classList.contains('active');
+            
+            if (!isActive) {
+                // Enter fullscreen
+                const solutionContent = document.getElementById('solutionContent');
+                const fullscreenContent = document.getElementById('fullscreenContent');
+                
+                // Clone content to fullscreen modal
+                fullscreenContent.innerHTML = solutionContent.innerHTML;
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                
+                // Re-render MathJax in fullscreen
+                if (window.MathJax) {
+                    MathJax.typesetPromise([fullscreenContent]).then(() => {
+                        adjustMathJaxForMobile();
+                    });
+                }
+            } else {
+                // Exit fullscreen
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+        
+        // Zoom functionality
+        function adjustZoom(delta) {
+            currentZoom = Math.max(0.5, Math.min(2, currentZoom + delta));
+            const content = document.getElementById('solutionContent');
+            content.style.transform = `scale(${currentZoom})`;
+            content.style.transformOrigin = 'top left';
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+            
+            // Re-adjust MathJax after zoom
+            setTimeout(() => adjustMathJaxForMobile(), 100);
+        }
+        
+        function adjustFullscreenZoom(delta) {
+            fullscreenZoom = Math.max(0.5, Math.min(2, fullscreenZoom + delta));
+            const content = document.getElementById('fullscreenContent');
+            content.style.transform = `scale(${fullscreenZoom})`;
+            content.style.transformOrigin = 'top left';
+            document.getElementById('fullscreenZoomLevel').textContent = Math.round(fullscreenZoom * 100) + '%';
+            
+            // Re-adjust MathJax after zoom
+            setTimeout(() => adjustMathJaxForMobile(), 100);
+        }
+        
+        // Scroll to top functionality
+        function scrollToTop() {
+            const solutionContent = document.getElementById('solutionContent');
+            if (solutionContent) {
+                solutionContent.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            } else {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
+        }
+        
+        // Update navigation dots
+        function updateNavDots(activeIndex) {
+            document.querySelectorAll('.nav-dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === activeIndex);
+            });
+        }
+        
+        // Generate navigation dots
+        function generateNavDots() {
+            const steps = document.querySelectorAll('.solution-step');
+            const navDots = document.getElementById('solutionNavDots');
+            
+            if (steps.length > 1) {
+                navDots.innerHTML = '';
+                steps.forEach((step, index) => {
+                    const dot = document.createElement('div');
+                    dot.className = `nav-dot ${index === 0 ? 'active' : ''}`;
+                    dot.setAttribute('data-step', `Step ${index + 1}`);
+                    dot.onclick = () => {
+                        document.querySelector(`.sequence-btn:nth-child(${index + 1})`).click();
+                    };
+                    navDots.appendChild(dot);
+                });
+                navDots.classList.add('visible');
+            }
+        }
+        
+        // Enhanced MathJax handling for mobile
+        function adjustMathJaxForMobile() {
+            document.querySelectorAll('.MathJax, .MathJax_Display').forEach(math => {
+                math.style.overflowX = 'auto';
+                math.style.maxWidth = '100%';
+                math.style.fontSize = window.innerWidth < 768 ? '14px' : '16px';
+                
+                // Add touch scrolling for mobile
+                if ('ontouchstart' in window) {
+                    math.style.webkitOverflowScrolling = 'touch';
+                }
+            });
         }
         
         // Enhanced image preview with animation
@@ -1159,16 +1668,6 @@ HTML_TEMPLATE = """
             solveBtn.style.animation = 'pulse 2s infinite';
         });
         
-        // Add pulse animation for loading button
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.7; }
-            }
-        `;
-        document.head.appendChild(style);
-        
         // Enhanced chat functionality
         function handleChatKeyPress(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -1247,13 +1746,10 @@ HTML_TEMPLATE = """
                 });
             }, 100);
             
-            // Re-render MathJax for new messages with proper overflow handling
+            // Re-render MathJax for new messages
             if (window.MathJax) {
                 MathJax.typesetPromise([messageDiv]).then(() => {
-                    messageDiv.querySelectorAll('.MathJax').forEach(math => {
-                        math.style.overflowX = 'auto';
-                        math.style.maxWidth = '100%';
-                    });
+                    adjustMathJaxForMobile();
                 });
             }
         }
@@ -1302,7 +1798,51 @@ HTML_TEMPLATE = """
             }
         }
         
-        // Initialize MathJax rendering with proper overflow handling
+        // Scroll event handlers
+        function handleScroll() {
+            const scrollToTopBtn = document.getElementById('scrollToTop');
+            const solutionContent = document.getElementById('solutionContent');
+            
+            if (solutionContent) {
+                const scrollTop = solutionContent.scrollTop;
+                const scrollHeight = solutionContent.scrollHeight;
+                const clientHeight = solutionContent.clientHeight;
+                
+                // Show/hide scroll to top button
+                if (scrollTop > 200) {
+                    scrollToTopBtn.classList.add('visible');
+                } else {
+                    scrollToTopBtn.classList.remove('visible');
+                }
+                
+                // Update active step based on scroll position
+                updateActiveStepOnScroll();
+            }
+        }
+        
+        function updateActiveStepOnScroll() {
+            const steps = document.querySelectorAll('.solution-step:not([style*="display: none"])');
+            const solutionContent = document.getElementById('solutionContent');
+            
+            if (steps.length === 0 || !solutionContent) return;
+            
+            const scrollTop = solutionContent.scrollTop;
+            const containerTop = solutionContent.offsetTop;
+            
+            let activeStepIndex = 0;
+            
+            steps.forEach((step, index) => {
+                const stepTop = step.offsetTop - containerTop;
+                if (scrollTop >= stepTop - 100) {
+                    activeStepIndex = index;
+                }
+            });
+            
+            // Update navigation dots
+            updateNavDots(activeStepIndex);
+        }
+        
+        // Initialize everything when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             // Set up initial tab transitions
             document.querySelectorAll('.tab-content').forEach(tab => {
@@ -1314,14 +1854,21 @@ HTML_TEMPLATE = """
                 step.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
             });
             
+            // Add scroll event listener
+            const solutionContent = document.getElementById('solutionContent');
+            if (solutionContent) {
+                solutionContent.addEventListener('scroll', handleScroll);
+            }
+            
+            // Generate navigation dots if steps exist
+            setTimeout(() => {
+                generateNavDots();
+            }, 500);
+            
             // Initialize MathJax with proper configuration for mobile
             if (window.MathJax) {
                 MathJax.typesetPromise().then(() => {
-                    // Ensure all math expressions handle overflow properly
-                    document.querySelectorAll('.MathJax').forEach(math => {
-                        math.style.overflowX = 'auto';
-                        math.style.maxWidth = '100%';
-                    });
+                    adjustMathJaxForMobile();
                 });
                 
                 // Configure MathJax for dynamic content
@@ -1342,6 +1889,19 @@ HTML_TEMPLATE = """
                     }
                 });
             });
+            
+            // Handle window resize for responsive adjustments
+            window.addEventListener('resize', () => {
+                adjustMathJaxForMobile();
+                
+                // Hide navigation dots on mobile
+                const navDots = document.getElementById('solutionNavDots');
+                if (window.innerWidth <= 1024) {
+                    navDots.classList.remove('visible');
+                } else if (document.querySelectorAll('.solution-step').length > 1) {
+                    navDots.classList.add('visible');
+                }
+            });
         });
         
         // Add keyboard shortcuts
@@ -1354,12 +1914,43 @@ HTML_TEMPLATE = """
                 }
             }
             
-            // Escape to clear chat input
+            // Escape to exit fullscreen or clear chat input
             if (e.key === 'Escape') {
-                const chatInput = document.getElementById('chatInput');
-                if (chatInput && document.activeElement === chatInput) {
-                    chatInput.value = '';
-                    chatInput.blur();
+                const fullscreenModal = document.getElementById('fullscreenModal');
+                if (fullscreenModal.classList.contains('active')) {
+                    toggleFullscreen();
+                } else {
+                    const chatInput = document.getElementById('chatInput');
+                    if (chatInput && document.activeElement === chatInput) {
+                        chatInput.value = '';
+                        chatInput.blur();
+                    }
+                }
+            }
+            
+            // F11 or F for fullscreen toggle
+            if (e.key === 'F11' || (e.key === 'f' && !e.ctrlKey && !e.metaKey)) {
+                e.preventDefault();
+                toggleFullscreen();
+            }
+            
+            // Arrow keys for step navigation
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                const activeBtn = document.querySelector('.sequence-btn.active');
+                if (activeBtn) {
+                    const buttons = Array.from(document.querySelectorAll('.sequence-btn'));
+                    const currentIndex = buttons.indexOf(activeBtn);
+                    let newIndex;
+                    
+                    if (e.key === 'ArrowLeft') {
+                        newIndex = Math.max(0, currentIndex - 1);
+                    } else {
+                        newIndex = Math.min(buttons.length - 1, currentIndex + 1);
+                    }
+                    
+                    if (newIndex !== currentIndex) {
+                        buttons[newIndex].click();
+                    }
                 }
             }
         });
@@ -1383,6 +1974,126 @@ HTML_TEMPLATE = """
                 imageObserver.observe(img);
             });
         }
+        
+        // Add pulse animation for loading button
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Touch gestures for mobile
+        if ('ontouchstart' in window) {
+            let touchStartX = 0;
+            let touchStartY = 0;
+            
+            document.addEventListener('touchstart', function(e) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            });
+            
+            document.addEventListener('touchend', function(e) {
+                if (!touchStartX || !touchStartY) return;
+                
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                
+                const diffX = touchStartX - touchEndX;
+                const diffY = touchStartY - touchEndY;
+                
+                // Only process horizontal swipes that are longer than vertical
+                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                    const activeBtn = document.querySelector('.sequence-btn.active');
+                    if (activeBtn) {
+                        const buttons = Array.from(document.querySelectorAll('.sequence-btn'));
+                        const currentIndex = buttons.indexOf(activeBtn);
+                        let newIndex;
+                        
+                        if (diffX > 0) { // Swipe left - next step
+                            newIndex = Math.min(buttons.length - 1, currentIndex + 1);
+                        } else { // Swipe right - previous step
+                            newIndex = Math.max(0, currentIndex - 1);
+                        }
+                        
+                        if (newIndex !== currentIndex) {
+                            buttons[newIndex].click();
+                        }
+                    }
+                }
+                
+                touchStartX = 0;
+                touchStartY = 0;
+            });
+        }
+        
+        // Auto-save zoom preferences
+        function saveZoomPreference() {
+            localStorage.setItem('jee-solver-zoom', currentZoom);
+            localStorage.setItem('jee-solver-fullscreen-zoom', fullscreenZoom);
+        }
+        
+        function loadZoomPreference() {
+            const savedZoom = localStorage.getItem('jee-solver-zoom');
+            const savedFullscreenZoom = localStorage.getItem('jee-solver-fullscreen-zoom');
+            
+            if (savedZoom) {
+                currentZoom = parseFloat(savedZoom);
+                const content = document.getElementById('solutionContent');
+                if (content) {
+                    content.style.transform = `scale(${currentZoom})`;
+                    content.style.transformOrigin = 'top left';
+                    document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+                }
+            }
+            
+            if (savedFullscreenZoom) {
+                fullscreenZoom = parseFloat(savedFullscreenZoom);
+                document.getElementById('fullscreenZoomLevel').textContent = Math.round(fullscreenZoom * 100) + '%';
+            }
+        }
+        
+        // Override zoom functions to save preferences
+        const originalAdjustZoom = adjustZoom;
+        const originalAdjustFullscreenZoom = adjustFullscreenZoom;
+        
+        adjustZoom = function(delta) {
+            originalAdjustZoom(delta);
+            saveZoomPreference();
+        };
+        
+        adjustFullscreenZoom = function(delta) {
+            originalAdjustFullscreenZoom(delta);
+            saveZoomPreference();
+        };
+        
+        // Load preferences on page load
+        setTimeout(loadZoomPreference, 100);
+        
+        // Accessibility improvements
+        document.addEventListener('keydown', function(e) {
+            // Add focus management for keyboard navigation
+            if (e.key === 'Tab') {
+                // Ensure focus is visible
+                document.documentElement.classList.add('keyboard-nav');
+            }
+        });
+        
+        document.addEventListener('mousedown', function() {
+            document.documentElement.classList.remove('keyboard-nav');
+        });
+        
+        // Add CSS for keyboard navigation
+        const accessibilityStyle = document.createElement('style');
+        accessibilityStyle.textContent = `
+            .keyboard-nav *:focus {
+                outline: 2px solid var(--primary) !important;
+                outline-offset: 2px !important;
+            }
+        `;
+        document.head.appendChild(accessibilityStyle);
     </script>
 </body>
 </html>

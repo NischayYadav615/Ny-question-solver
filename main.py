@@ -166,36 +166,20 @@ HTML_TEMPLATE = """
             border: 1px solid rgba(255,255,255,0.3);
         }
         
-        /* Main Content - Fixed Layout */
+        /* Main Content */
         .main-content { 
             display: grid;
             grid-template-columns: 1fr 2fr;
             gap: 30px; 
             padding: 40px;
-            height: calc(100vh - 200px);
             min-height: 600px;
-            max-height: 900px;
             position: relative;
-            overflow: hidden;
         }
         
         .left-panel, .right-panel {
             display: flex;
             flex-direction: column;
             gap: 25px;
-            min-height: 0;
-            overflow: hidden;
-        }
-        
-        .left-panel {
-            max-height: 100%;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-        
-        .right-panel {
-            max-height: 100%;
-            overflow: hidden;
         }
         
         /* Input Section */
@@ -936,18 +920,7 @@ HTML_TEMPLATE = """
             word-wrap: break-word;
             animation: messageSlideIn 0.4s ease-out;
             position: relative;
-            overflow: hidden;
-            word-break: break-word;
-            overflow-wrap: break-word;
-            hyphens: auto;
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-        
-        .message * {
-            max-width: 100%;
-            box-sizing: border-box;
+            overflow-x: auto;
         }
         
         @keyframes messageSlideIn {
@@ -967,8 +940,6 @@ HTML_TEMPLATE = """
             margin-left: auto;
             border-bottom-right-radius: 8px;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-            max-width: 85%;
-            margin-right: 0;
         }
         
         .ai-message {
@@ -976,65 +947,15 @@ HTML_TEMPLATE = """
             color: var(--text-primary);
             border-bottom-left-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            max-width: 95%;
-            margin-left: 0;
         }
         
-        .ai-message .math-expression, .ai-message .MathJax, .ai-message .MathJax_Display {
-            background: white !important;
-            margin: 10px 0 !important;
-            padding: 15px !important;
-            border-radius: 8px !important;
-            border-left: 3px solid var(--primary) !important;
-            overflow-x: auto !important;
-            max-width: 100% !important;
-            width: 100% !important;
-            box-sizing: border-box !important;
-            white-space: nowrap !important;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .ai-message .MathJax_Display::-webkit-scrollbar {
-            height: 8px;
-        }
-        
-        .ai-message .MathJax_Display::-webkit-scrollbar-track {
-            background: rgba(102, 126, 234, 0.1);
-            border-radius: 4px;
-        }
-        
-        .ai-message .MathJax_Display::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 4px;
-        }
-        
-        /* Text content overflow handling in chat */
-        .message p, .message div, .message span {
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 100%;
-        }
-        
-        .message pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            overflow-x: auto;
-            max-width: 100%;
+        .ai-message .math-expression, .ai-message .MathJax {
+            background: white;
+            margin: 10px 0;
             padding: 10px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 6px;
-            margin: 8px 0;
-            font-size: 13px;
-            line-height: 1.4;
-        }
-        
-        .message code {
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            padding: 2px 4px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 3px;
-            font-size: 0.85em;
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+            overflow-x: auto;
         }
         
         .chat-input-area {
@@ -1253,15 +1174,12 @@ HTML_TEMPLATE = """
             text-align: center;
         }
         
-        /* Responsive Design - Fixed Mobile Layout */
+        /* Responsive Design */
         @media (max-width: 1024px) {
             .main-content {
                 grid-template-columns: 1fr;
                 gap: 25px;
                 padding: 30px;
-                height: calc(100vh - 180px);
-                min-height: 500px;
-                max-height: none;
             }
             
             .container {
@@ -1270,27 +1188,6 @@ HTML_TEMPLATE = """
             
             .solution-nav-dots {
                 display: none;
-            }
-            
-            .left-panel {
-                max-height: none;
-                order: 1;
-            }
-            
-            .right-panel {
-                max-height: calc(100vh - 300px);
-                min-height: 400px;
-                order: 2;
-            }
-            
-            .solution-area {
-                max-height: 60vh;
-                min-height: 300px;
-            }
-            
-            .chat-area {
-                max-height: 40vh;
-                min-height: 250px;
             }
         }
         
@@ -1315,11 +1212,9 @@ HTML_TEMPLATE = """
             
             .main-content {
                 padding: 20px;
-                height: calc(100vh - 160px);
-                min-height: 450px;
             }
             
-            .input-section {
+            .input-section, .solution-area, .chat-area {
                 padding: 20px;
             }
             
@@ -1340,7 +1235,10 @@ HTML_TEMPLATE = """
             .sequence-btn {
                 padding: 10px 16px;
                 font-size: 13px;
-                min-width: 80px;
+            }
+            
+            .chat-area {
+                height: 400px;
             }
             
             .solution-header {
@@ -1355,18 +1253,6 @@ HTML_TEMPLATE = """
                 justify-content: center;
             }
             
-            .chat-header {
-                padding: 20px;
-                flex-direction: column;
-                gap: 10px;
-                text-align: center;
-            }
-            
-            .chat-controls {
-                width: 100%;
-                justify-content: center;
-            }
-            
             .fullscreen-content {
                 padding: 20px;
             }
@@ -1377,14 +1263,6 @@ HTML_TEMPLATE = """
                 width: 50px;
                 height: 50px;
                 font-size: 18px;
-            }
-            
-            .solution-area {
-                max-height: 55vh;
-            }
-            
-            .chat-area {
-                max-height: 35vh;
             }
         }
         
@@ -1408,21 +1286,11 @@ HTML_TEMPLATE = """
             .main-content {
                 padding: 15px;
                 gap: 20px;
-                height: calc(100vh - 140px);
-                min-height: 400px;
             }
             
             .message {
                 max-width: 95%;
                 padding: 12px 16px;
-            }
-            
-            .user-message {
-                max-width: 90%;
-            }
-            
-            .ai-message {
-                max-width: 98%;
             }
             
             .solution-step {
@@ -1442,16 +1310,6 @@ HTML_TEMPLATE = """
             .MathJax_Display {
                 padding: 15px !important;
                 font-size: 14px !important;
-            }
-            
-            .solution-area {
-                max-height: 50vh;
-                min-height: 200px;
-            }
-            
-            .chat-area {
-                max-height: 40vh;
-                min-height: 180px;
             }
         }
         
@@ -1596,13 +1454,7 @@ HTML_TEMPLATE = """
                     </div>
                     
                     <div class="chat-area">
-                        <div class="chat-header">
-                            <h3>💬 Chat with NY AI</h3>
-                            <div class="chat-controls">
-                                <button class="clear-chat-btn" onclick="clearChat()" title="Clear Chat">🗑️ Clear</button>
-                            </div>
-                        </div>
-                        
+                        <h3>💬 Chat with NY AI</h3>
                         <div class="chat-messages" id="chatMessages">
                             {% for message in chat_history %}
                             <div class="message {{ 'user-message' if message.role == 'user' else 'ai-message' }}">
@@ -1981,7 +1833,6 @@ HTML_TEMPLATE = """
             });
         }
         
-        // Enhanced chat functionality with content constraining
         function addMessageToChat(message, role) {
             const chatMessages = document.getElementById('chatMessages');
             
@@ -1999,135 +1850,11 @@ HTML_TEMPLATE = """
             
             chatMessages.appendChild(messageDiv);
             
-            // Constrain message content to prevent overflow
-            constrainMessageContent(messageDiv);
-            
             // Animate message in
             setTimeout(() => {
                 messageDiv.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
                 messageDiv.style.opacity = '1';
                 messageDiv.style.transform = 'translateY(0) scale(1)';
-            }, 50);
-            
-            // Smooth scroll to bottom
-            setTimeout(() => {
-                chatMessages.scrollTo({
-                    top: chatMessages.scrollHeight,
-                    behavior: 'smooth'
-                });
-            }, 100);
-            
-            // Re-render MathJax for new messages
-            if (window.MathJax) {
-                MathJax.typesetPromise([messageDiv]).then(() => {
-                    adjustMathJaxForChat(messageDiv);
-                });
-            }
-        }
-        
-        // Function to constrain message content and prevent layout shifts
-        function constrainMessageContent(messageElement) {
-            if (!messageElement) return;
-            
-            // Ensure all child elements respect container width
-            const allElements = messageElement.querySelectorAll('*');
-            allElements.forEach(element => {
-                // Skip MathJax elements as they have their own handling
-                if (!element.classList.contains('MathJax') && 
-                    !element.classList.contains('MathJax_Display')) {
-                    
-                    element.style.maxWidth = '100%';
-                    element.style.boxSizing = 'border-box';
-                    element.style.wordWrap = 'break-word';
-                    element.style.overflowWrap = 'break-word';
-                }
-            });
-            
-            // Handle long text content
-            const textNodes = messageElement.querySelectorAll('p, div, span, h1, h2, h3, h4, h5, h6');
-            textNodes.forEach(node => {
-                if (node.scrollWidth > node.clientWidth) {
-                    node.style.wordBreak = 'break-word';
-                    node.style.hyphens = 'auto';
-                }
-            });
-        }
-        
-        // Enhanced MathJax handling for chat messages
-        function adjustMathJaxForChat(messageElement) {
-            if (!messageElement) {
-                // Apply to all chat messages
-                document.querySelectorAll('.chat-messages .message').forEach(msg => {
-                    adjustMathJaxForChat(msg);
-                });
-                return;
-            }
-            
-            const mathElements = messageElement.querySelectorAll('.MathJax, .MathJax_Display');
-            mathElements.forEach(math => {
-                // Ensure proper container constraints
-                math.style.maxWidth = '100%';
-                math.style.width = '100%';
-                math.style.overflowX = 'auto';
-                math.style.overflowY = 'hidden';
-                math.style.boxSizing = 'border-box';
-                math.style.webkitOverflowScrolling = 'touch';
-                
-                // Responsive font sizing for chat
-                const fontSize = window.innerWidth < 480 ? '12px' : 
-                               window.innerWidth < 768 ? '13px' : '14px';
-                math.style.fontSize = fontSize;
-                
-                // Add scroll indicator for wide expressions
-                if (math.scrollWidth > math.clientWidth) {
-                    const scrollIndicator = document.createElement('div');
-                    scrollIndicator.style.cssText = `
-                        position: absolute;
-                        top: 5px;
-                        right: 5px;
-                        background: var(--accent);
-                        color: white;
-                        padding: 2px 6px;
-                        border-radius: 8px;
-                        font-size: 10px;
-                        font-weight: 600;
-                        opacity: 0.8;
-                        pointer-events: none;
-                    `;
-                    scrollIndicator.textContent = '←→';
-                    math.style.position = 'relative';
-                    
-                    // Remove existing indicator if present
-                    const existingIndicator = math.querySelector('[style*="position: absolute"]');
-                    if (existingIndicator) {
-                        existingIndicator.remove();
-                    }
-                    
-                    math.appendChild(scrollIndicator);
-                }
-            });
-        }
-        
-        // Clear chat function
-        function clearChat() {
-            const chatMessages = document.getElementById('chatMessages');
-            chatMessages.innerHTML = `
-                <div style="text-align: center; color: var(--text-light); padding: 40px 20px;">
-                    <div style="font-size: 2.5rem; margin-bottom: 15px; opacity: 0.6;">💭</div>
-                    <p>Ask me anything about the solution or related concepts!</p>
-                </div>
-            `;
-            
-            // Clear server-side chat history
-            fetch('/clear_chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            }).catch(error => {
-                console.log('Error clearing chat:', error);
-            });
-        }1)';
             }, 50);
             
             // Smooth scroll to bottom
@@ -2490,6 +2217,7 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
+
 def encode_image_to_base64(image_data):
     """Convert image data to base64 string."""
     if isinstance(image_data, bytes):

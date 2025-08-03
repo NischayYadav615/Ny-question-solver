@@ -1,73 +1,28 @@
 import os
 import json
 import base64
-import logging
-from flask import Flask, request, render_template_string, session, jsonify, redirect, url_for
+from flask import Flask, request, render_template_string, session, jsonify
 import requests
 from dotenv import load_dotenv
 from PIL import Image
 import io
 import uuid
-import datetime
-import re
-import sqlite3
-from werkzeug.security import generate_password_hash, check_password_hash
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 load_dotenv()
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.urandom(24)  # For session management
 
-# Configuration
+# API Configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or "AIzaSyCfiA0TjeSEUFqJkgYtbLzjsbEdNW_ZTpk"
 GEMINI_VISION_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
-DATABASE_NAME = 'jee_solver.db'
-
-# Initialize database
-def init_db():
-    with sqlite3.connect(DATABASE_NAME) as conn:
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS solutions (
-                id TEXT PRIMARY KEY,
-                question_text TEXT,
-                solution_steps TEXT,
-                subject TEXT,
-                difficulty TEXT,
-                timestamp DATETIME,
-                user_id TEXT
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                username TEXT UNIQUE,
-                email TEXT UNIQUE,
-                password_hash TEXT,
-                created_at DATETIME
-            )
-        ''')
-        conn.commit()
-
-init_db()
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=5.0">
-    <title>JEE Question Solver by Nischay - Advanced Problem Solver</title>
-    
-    <!-- Preload resources -->
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NY AI - Advanced JEE Question Solver</title>
     
     <!-- MathJax Configuration -->
     <script>
@@ -76,8 +31,7 @@ HTML_TEMPLATE = """
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
                 displayMath: [['$$', '$$'], ['\\[', '\\]']],
                 processEscapes: true,
-                processEnvironments: true,
-                packages: {'[+]': ['ams', 'newcommand', 'configmacros', 'physics', 'chemistry']}
+                processEnvironments: true
             },
             options: {
                 skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
@@ -87,691 +41,505 @@ HTML_TEMPLATE = """
             startup: {
                 pageReady: () => {
                     return MathJax.startup.defaultPageReady().then(() => {
-                        optimizeMathDisplay();
+                        adjustMathJaxForMobile();
                     });
                 }
             }
         };
-        
-        function optimizeMathDisplay() {
-            const mathElements = document.querySelectorAll('.MathJax, .MathJax_Display');
-            mathElements.forEach(el => {
-                el.style.maxWidth = '100%';
-                el.style.overflowX = 'auto';
-                el.style.overflowY = 'hidden';
-                el.style.webkitOverflowScrolling = 'touch';
-            });
-        }
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js" async></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
     
     <style>
-        /* Advanced CSS Variables System */
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+        }
+        
         :root {
-            /* Brand Colors */
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --primary-light: #3b82f6;
-            --secondary: #7c3aed;
-            --accent: #f59e0b;
-            --accent-secondary: #ef4444;
-            
-            /* JEE Subject Colors */
-            --physics: #0ea5e9;
-            --chemistry: #10b981;
-            --mathematics: #8b5cf6;
-            
-            /* Semantic Colors */
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --error: #ef4444;
-            --info: #06b6d4;
-            
-            /* Neutral Colors */
-            --white: #ffffff;
-            --gray-50: #f9fafb;
-            --gray-100: #f3f4f6;
-            --gray-200: #e5e7eb;
-            --gray-300: #d1d5db;
-            --gray-400: #9ca3af;
-            --gray-500: #6b7280;
-            --gray-600: #4b5563;
-            --gray-700: #374151;
-            --gray-800: #1f2937;
-            --gray-900: #111827;
-            
-            /* Background Colors */
-            --bg-primary: var(--white);
-            --bg-secondary: var(--gray-50);
-            --bg-tertiary: var(--gray-100);
-            --bg-accent: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            
-            /* Text Colors */
-            --text-primary: var(--gray-900);
-            --text-secondary: var(--gray-700);
-            --text-muted: var(--gray-500);
-            --text-inverse: var(--white);
-            
-            /* Border & Shadow */
-            --border: var(--gray-200);
-            --border-hover: var(--gray-300);
-            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-            
-            /* Spacing */
-            --spacing-xs: 0.25rem;
-            --spacing-sm: 0.5rem;
-            --spacing-md: 1rem;
-            --spacing-lg: 1.5rem;
-            --spacing-xl: 2rem;
-            --spacing-2xl: 3rem;
-            
-            /* Border Radius */
-            --radius-sm: 0.375rem;
-            --radius: 0.5rem;
-            --radius-md: 0.75rem;
-            --radius-lg: 1rem;
-            --radius-xl: 1.5rem;
-            --radius-full: 9999px;
-            
-            /* Typography */
-            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            --font-size-xs: 0.75rem;
-            --font-size-sm: 0.875rem;
-            --font-size-base: 1rem;
-            --font-size-lg: 1.125rem;
-            --font-size-xl: 1.25rem;
-            --font-size-2xl: 1.5rem;
-            --font-size-3xl: 1.875rem;
-            --font-size-4xl: 2.25rem;
-            
-            /* Transitions */
-            --transition: all 0.15s ease-in-out;
-            --transition-slow: all 0.3s ease-in-out;
-            
-            /* Layout */
-            --header-height: 4rem;
-            --sidebar-width: 16rem;
-            --container-padding: 1.5rem;
+            --primary: #667eea;
+            --primary-dark: #5a67d8;
+            --secondary: #764ba2;
+            --accent: #ff6b6b;
+            --accent-light: #ffd93d;
+            --success: #48bb78;
+            --bg-primary: #f8fafc;
+            --bg-secondary: #edf2f7;
+            --text-primary: #2d3748;
+            --text-secondary: #4a5568;
+            --text-light: #718096;
+            --border: #e2e8f0;
+            --shadow: 0 10px 40px rgba(0,0,0,0.1);
+            --shadow-lg: 0 20px 60px rgba(0,0,0,0.15);
+            --radius: 16px;
+            --radius-lg: 24px;
         }
         
-        /* Dark mode */
-        [data-theme="dark"] {
-            --bg-primary: var(--gray-900);
-            --bg-secondary: var(--gray-800);
-            --bg-tertiary: var(--gray-700);
-            --text-primary: var(--gray-100);
-            --text-secondary: var(--gray-300);
-            --text-muted: var(--gray-400);
-            --border: var(--gray-700);
-            --border-hover: var(--gray-600);
-        }
-        
-        /* Reset & Base Styles */
-        *, *::before, *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        html {
-            font-size: 16px;
-            scroll-behavior: smooth;
-            -webkit-text-size-adjust: 100%;
-        }
-        
-        body {
-            font-family: var(--font-family);
-            font-size: var(--font-size-base);
-            line-height: 1.6;
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            min-height: 100vh;
             color: var(--text-primary);
-            background: var(--bg-secondary);
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            line-height: 1.6;
             overflow-x: hidden;
         }
         
-        /* Layout Components */
-        .app-wrapper {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
         }
         
-        /* Enhanced Header */
+        .main-wrapper {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Header Styles */
         .header {
-            background: var(--bg-accent);
-            color: var(--text-inverse);
-            padding: 0 var(--container-padding);
-            height: var(--header-height);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: var(--shadow-md);
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, var(--success) 100%);
+            color: white;
+            padding: 50px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
         }
         
         .header::before {
             content: '';
             position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, 
-                rgba(255, 255, 255, 0.1) 0%, 
-                transparent 50%, 
-                rgba(255, 255, 255, 0.05) 100%);
-            pointer-events: none;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 50%);
+            animation: headerShine 6s ease-in-out infinite;
         }
         
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-md);
+        @keyframes headerShine {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+        
+        .ny-ai-logo {
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            letter-spacing: -2px;
             position: relative;
             z-index: 1;
         }
         
-        .logo-icon {
-            width: 2.5rem;
-            height: 2.5rem;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            transition: var(--transition);
-        }
-        
-        .logo-icon:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(1.05);
-        }
-        
-        .logo-content h1 {
-            font-size: var(--font-size-xl);
-            font-weight: 800;
-            letter-spacing: -0.025em;
-            margin-bottom: 0.125rem;
-        }
-        
-        .logo-content .tagline {
-            font-size: var(--font-size-xs);
-            font-weight: 500;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        
-        .header-controls {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-md);
+        .header h1 { 
+            font-size: 2.8rem; 
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
             position: relative;
             z-index: 1;
         }
         
-        .header-stats {
-            display: flex;
-            gap: var(--spacing-lg);
-            font-size: var(--font-size-sm);
+        .header p { 
+            font-size: 1.2rem; 
+            opacity: 0.95; 
+            font-weight: 400;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .ny-ai-badge {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            background: rgba(255,255,255,0.25);
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
             font-weight: 600;
-        }
-        
-        .stat-item {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-xs);
-            padding: var(--spacing-sm) var(--spacing-md);
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: var(--radius-full);
             backdrop-filter: blur(10px);
-        }
-        
-        .header-actions {
-            display: flex;
-            gap: var(--spacing-sm);
-        }
-        
-        .header-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: var(--text-inverse);
-            padding: var(--spacing-sm) var(--spacing-md);
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: var(--transition);
-            font-size: var(--font-size-sm);
-            font-weight: 500;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        
-        .header-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-1px);
+            border: 1px solid rgba(255,255,255,0.3);
         }
         
         /* Main Content */
-        .main-container {
-            flex: 1;
+        .main-content { 
             display: grid;
-            grid-template-columns: 1fr 1.2fr;
-            min-height: calc(100vh - var(--header-height));
+            grid-template-columns: 1fr 2fr;
+            gap: 30px; 
+            padding: 40px;
+            min-height: 600px;
+            position: relative;
+        }
+        
+        .left-panel, .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
         }
         
         /* Input Section */
         .input-section {
             background: var(--bg-primary);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .section-header {
-            padding: var(--spacing-xl) var(--container-padding) var(--spacing-lg);
-            border-bottom: 1px solid var(--border);
-            background: var(--bg-secondary);
-        }
-        
-        .section-title {
-            font-size: var(--font-size-xl);
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: var(--spacing-xs);
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-        }
-        
-        .section-subtitle {
-            font-size: var(--font-size-sm);
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-        
-        .input-content {
-            flex: 1;
-            padding: var(--container-padding);
-            display: flex;
-            flex-direction: column;
-            gap: var(--spacing-xl);
-            overflow-y: auto;
-        }
-        
-        /* Subject Selection */
-        .subject-selector {
-            background: var(--bg-secondary);
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-lg);
-            border: 2px solid var(--border);
-            transition: var(--transition);
-        }
-        
-        .subject-selector:hover {
-            border-color: var(--border-hover);
-        }
-        
-        .subject-title {
-            font-size: var(--font-size-lg);
-            font-weight: 600;
-            margin-bottom: var(--spacing-md);
-            color: var(--text-primary);
-        }
-        
-        .subject-options {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: var(--spacing-md);
-        }
-        
-        .subject-option {
+            border-radius: var(--radius);
+            padding: 30px;
+            border: 2px solid transparent;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
-            cursor: pointer;
-        }
-        
-        .subject-option input[type="radio"] {
-            position: absolute;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-        
-        .subject-label {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: var(--spacing-sm);
-            padding: var(--spacing-lg) var(--spacing-md);
-            border: 2px solid var(--border);
-            border-radius: var(--radius-md);
-            transition: var(--transition);
-            background: var(--bg-primary);
-        }
-        
-        .subject-option input[type="radio"]:checked + .subject-label {
-            border-color: var(--primary);
-            background: rgba(37, 99, 235, 0.05);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
-        
-        .subject-icon {
-            font-size: 1.5rem;
-            margin-bottom: var(--spacing-xs);
-        }
-        
-        .subject-name {
-            font-weight: 600;
-            font-size: var(--font-size-sm);
-            text-align: center;
-        }
-        
-        /* Enhanced Tab System */
-        .tab-container {
-            background: var(--bg-secondary);
-            border-radius: var(--radius-lg);
-            border: 2px solid var(--border);
             overflow: hidden;
         }
         
-        .tab-header {
-            display: flex;
-            background: var(--bg-tertiary);
-        }
-        
-        .tab-button {
-            flex: 1;
-            padding: var(--spacing-lg);
-            border: none;
-            background: transparent;
-            color: var(--text-secondary);
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            position: relative;
-        }
-        
-        .tab-button.active {
-            color: var(--primary);
-            background: var(--bg-primary);
-        }
-        
-        .tab-button::after {
+        .input-section::before {
             content: '';
             position: absolute;
-            bottom: 0;
+            top: 0;
             left: 0;
             right: 0;
-            height: 2px;
-            background: var(--primary);
-            transform: scaleX(0);
-            transition: var(--transition);
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(255, 107, 107, 0.1) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
         
-        .tab-button.active::after {
-            transform: scaleX(1);
+        .input-section:hover::before {
+            opacity: 1;
         }
         
-        .tab-content {
-            padding: var(--spacing-xl);
-            display: none;
+        .input-section:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
         }
         
-        .tab-content.active {
-            display: block;
-            animation: fadeInUp 0.3s ease-out;
+        .input-section h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 30px;
+            background: var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 600;
+            font-size: 0.95rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .tab-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+        
+        .tab-btn:hover::before {
+            left: 100%;
+        }
+        
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .tab-content { 
+            display: none; 
+            position: relative;
+            z-index: 1;
+        }
+        .tab-content.active { 
+            display: block; 
+            animation: fadeInUp 0.4s ease-out;
         }
         
         @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
         
-        /* Enhanced File Upload */
-        .file-upload-area {
+        .file-upload {
             border: 3px dashed var(--border);
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-2xl);
+            border-radius: var(--radius);
+            padding: 50px 30px;
             text-align: center;
             cursor: pointer;
-            transition: var(--transition);
-            background: var(--bg-primary);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: white;
             position: relative;
             overflow: hidden;
         }
         
-        .file-upload-area:hover,
-        .file-upload-area.dragover {
+        .file-upload::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+            transition: all 0.4s ease;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+        }
+        
+        .file-upload:hover::before {
+            width: 200px;
+            height: 200px;
+        }
+        
+        .file-upload:hover, .file-upload.drag-over {
             border-color: var(--primary);
-            background: rgba(37, 99, 235, 0.02);
-            transform: scale(1.01);
+            background: rgba(102, 126, 234, 0.05);
+            transform: scale(1.02);
         }
         
-        .upload-icon {
-            font-size: 3rem;
-            color: var(--primary);
-            margin-bottom: var(--spacing-lg);
-            display: block;
-        }
-        
-        .upload-text {
-            font-size: var(--font-size-lg);
+        .file-upload div {
+            position: relative;
+            z-index: 1;
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: var(--spacing-sm);
+            font-size: 1.1rem;
         }
         
-        .upload-hint {
-            font-size: var(--font-size-sm);
-            color: var(--text-muted);
+        .file-upload small {
+            position: relative;
+            z-index: 1;
+            color: var(--text-light);
+            display: block;
+            margin-top: 10px;
         }
         
-        .file-input {
-            position: absolute;
-            inset: 0;
-            opacity: 0;
-            cursor: pointer;
-        }
-        
-        /* Image Preview */
-        .image-preview {
-            margin-top: var(--spacing-lg);
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            border: 1px solid var(--border);
-            background: var(--bg-primary);
-            display: none;
-        }
-        
-        .preview-image {
+        input[type="url"] {
             width: 100%;
-            height: auto;
-            max-height: 300px;
-            object-fit: contain;
-        }
-        
-        .preview-footer {
-            padding: var(--spacing-md);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--bg-secondary);
-            border-top: 1px solid var(--border);
-        }
-        
-        .preview-info {
-            font-size: var(--font-size-sm);
-            color: var(--text-muted);
-        }
-        
-        .remove-button {
-            background: var(--error);
-            color: var(--text-inverse);
-            border: none;
-            padding: var(--spacing-sm) var(--spacing-md);
+            padding: 18px 20px;
+            border: 2px solid var(--border);
             border-radius: var(--radius);
-            cursor: pointer;
-            font-size: var(--font-size-sm);
-            font-weight: 500;
-            transition: var(--transition);
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+            font-family: inherit;
         }
         
-        .remove-button:hover {
-            background: #dc2626;
+        input[type="url"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
             transform: translateY(-1px);
         }
         
-        /* URL Input */
-        .url-input {
-            width: 100%;
-            padding: var(--spacing-lg);
-            border: 2px solid var(--border);
-            border-radius: var(--radius-lg);
-            font-size: var(--font-size-base);
-            font-family: inherit;
-            transition: var(--transition);
-            background: var(--bg-primary);
-        }
-        
-        .url-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-        
-        /* Solve Button */
-        .solve-button {
-            background: var(--bg-accent);
-            color: var(--text-inverse);
+        .solve-btn {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--primary) 100%);
+            color: white;
+            padding: 20px 40px;
             border: none;
-            padding: var(--spacing-lg) var(--spacing-2xl);
-            border-radius: var(--radius-lg);
-            font-size: var(--font-size-lg);
+            border-radius: var(--radius);
+            font-size: 18px;
             font-weight: 700;
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             width: 100%;
-            margin-top: var(--spacing-xl);
+            margin-top: 25px;
             position: relative;
             overflow: hidden;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            box-shadow: var(--shadow-lg);
+            letter-spacing: 0.5px;
         }
         
-        .solve-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-xl);
+        .solve-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.6s;
         }
         
-        .solve-button:disabled {
-            background: var(--gray-400);
+        .solve-btn:hover::before {
+            left: 100%;
+        }
+        
+        .solve-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(255, 107, 107, 0.4);
+        }
+        
+        .solve-btn:active {
+            transform: translateY(-1px);
+        }
+        
+        .solve-btn:disabled {
+            background: var(--text-light);
             cursor: not-allowed;
             transform: none;
-            box-shadow: var(--shadow-sm);
+            box-shadow: none;
         }
         
-        /* Solution Section */
-        .solution-section {
+        .image-preview {
+            max-width: 100%;
+            border-radius: var(--radius);
+            margin: 20px 0;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease;
+        }
+        
+        .image-preview:hover {
+            transform: scale(1.02);
+        }
+        
+        /* Enhanced Solution Area - Fixed Width Structure */
+        .solution-area {
             background: var(--bg-primary);
+            border-radius: var(--radius);
+            padding: 0;
+            position: relative;
+            overflow: hidden;
+            min-height: 600px;
+            max-height: 800px;
             display: flex;
             flex-direction: column;
+            width: 100%;
         }
         
         .solution-header {
-            padding: var(--spacing-xl) var(--container-padding);
-            background: var(--bg-accent);
-            color: var(--text-inverse);
+            padding: 25px 30px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 15px;
             position: sticky;
             top: 0;
-            z-index: 100;
-            backdrop-filter: blur(10px);
+            z-index: 10;
+            flex-shrink: 0;
+            min-height: 80px;
         }
         
-        .solution-title {
-            font-size: var(--font-size-xl);
-            font-weight: 700;
+        .solution-header h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 0;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .solution-controls {
             display: flex;
             align-items: center;
-            gap: var(--spacing-sm);
+            gap: 15px;
+            flex-shrink: 0;
         }
         
-        .solution-actions {
-            display: flex;
-            gap: var(--spacing-sm);
-        }
-        
-        .action-button {
+        .fullscreen-btn, .zoom-btn {
             background: rgba(255, 255, 255, 0.2);
             border: none;
-            color: var(--text-inverse);
-            padding: var(--spacing-sm) var(--spacing-md);
-            border-radius: var(--radius);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
             cursor: pointer;
-            transition: var(--transition);
-            font-size: var(--font-size-sm);
+            transition: all 0.3s ease;
+            font-size: 16px;
             backdrop-filter: blur(10px);
+            flex-shrink: 0;
         }
         
-        .action-button:hover {
+        .fullscreen-btn:hover, .zoom-btn:hover {
             background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
         }
         
         .solution-content {
             flex: 1;
-            padding: var(--container-padding);
             overflow-y: auto;
-            background: var(--bg-secondary);
+            overflow-x: hidden;
+            padding: 30px;
+            scroll-behavior: smooth;
+            position: relative;
+            height: calc(100% - 80px);
+            min-height: 0;
         }
         
-        /* Enhanced scrollbar */
+        /* Enhanced scrollbar with better visibility */
         .solution-content::-webkit-scrollbar {
-            width: 8px;
+            width: 14px;
         }
         
         .solution-content::-webkit-scrollbar-track {
-            background: var(--bg-tertiary);
-            border-radius: var(--radius);
+            background: var(--bg-secondary);
+            border-radius: 7px;
+            margin: 5px 0;
+            border: 1px solid var(--border);
         }
         
         .solution-content::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: var(--radius);
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 7px;
+            border: 2px solid var(--bg-secondary);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
         }
         
         .solution-content::-webkit-scrollbar-thumb:hover {
-            background: var(--primary-dark);
+            background: linear-gradient(135deg, var(--primary-dark), var(--accent));
+            box-shadow: inset 0 1px 5px rgba(0,0,0,0.2);
         }
         
-        /* Solution Steps */
-        .solution-steps {
+        .solution-content::-webkit-scrollbar-thumb:active {
+            background: linear-gradient(135deg, var(--accent), var(--primary));
+        }
+        
+        .solution-sequence {
             display: flex;
             flex-direction: column;
-            gap: var(--spacing-xl);
+            gap: 25px;
+            width: 100%;
+            min-width: 0;
         }
         
         .solution-step {
-            background: var(--bg-primary);
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-xl);
-            border-left: 4px solid var(--primary);
-            box-shadow: var(--shadow-md);
+            background: white;
+            border-radius: var(--radius);
+            padding: 25px;
+            border-left: 5px solid var(--accent);
+            box-shadow: 0 6px 25px rgba(0,0,0,0.08);
             opacity: 0;
-            transform: translateY(20px);
-            animation: slideIn 0.5s ease-out forwards;
+            transform: translateY(30px);
+            animation: slideInStep 0.6s ease forwards;
+            position: relative;
+            overflow: hidden;
+            word-wrap: break-word;
+            width: 100%;
+            box-sizing: border-box;
+            max-width: 100%;
         }
         
         .solution-step:nth-child(1) { animation-delay: 0.1s; }
@@ -781,7 +549,7 @@ HTML_TEMPLATE = """
         .solution-step:nth-child(5) { animation-delay: 0.5s; }
         .solution-step:nth-child(6) { animation-delay: 0.6s; }
         
-        @keyframes slideIn {
+        @keyframes slideInStep {
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -791,99 +559,468 @@ HTML_TEMPLATE = """
         .step-header {
             display: flex;
             align-items: center;
-            gap: var(--spacing-md);
-            margin-bottom: var(--spacing-lg);
+            gap: 15px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            flex-wrap: wrap;
         }
         
         .step-number {
-            background: var(--primary);
-            color: var(--text-inverse);
-            width: 2rem;
-            height: 2rem;
+            background: linear-gradient(135deg, var(--accent), var(--primary));
+            color: white;
+            width: 35px;
+            height: 35px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 16px;
             font-weight: 700;
-            font-size: var(--font-size-sm);
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+            flex-shrink: 0;
         }
         
         .step-title {
-            font-size: var(--font-size-lg);
-            font-weight: 700;
-            color: var(--text-primary);
+            flex: 1;
+            min-width: 0;
+            word-break: break-word;
         }
         
         .step-content {
             line-height: 1.8;
             color: var(--text-secondary);
-            font-size: var(--font-size-base);
+            word-break: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         
-        /* Math expressions */
-        .math-expression,
-        .MathJax,
-        .MathJax_Display {
-            background: var(--bg-tertiary) !important;
-            padding: var(--spacing-lg) !important;
-            border-radius: var(--radius) !important;
-            margin: var(--spacing-lg) 0 !important;
-            border-left: 3px solid var(--accent) !important;
-            overflow-x: auto !important;
+        .step-content * {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        /* Enhanced Math expressions with better containment */
+        .math-expression, .MathJax, .MathJax_Display {
             max-width: 100% !important;
+            width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid var(--accent-light);
+            font-family: 'Courier New', monospace;
+            white-space: nowrap;
+            scroll-behavior: smooth;
+            box-sizing: border-box;
+            -webkit-overflow-scrolling: touch;
         }
         
-        /* Empty State */
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
+        .MathJax_Display {
+            padding: 20px !important;
+            margin: 20px 0 !important;
+            background: var(--bg-secondary) !important;
+            border-radius: 12px !important;
+            border-left: 4px solid var(--primary) !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05) !important;
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        
+        .MathJax_Display::-webkit-scrollbar {
+            height: 10px;
+        }
+        
+        .MathJax_Display::-webkit-scrollbar-track {
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 5px;
+        }
+        
+        .MathJax_Display::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 5px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+        
+        .MathJax_Display::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
+        }
+        
+        /* Text content overflow handling */
+        .step-content p, .step-content div, .step-content span {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+        }
+        
+        .step-content pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-x: auto;
+            max-width: 100%;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .step-content code {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            padding: 2px 6px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        
+        .step-content table {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+            display: block;
+            white-space: nowrap;
+        }
+        
+        .step-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .final-answer {
+            background: linear-gradient(135deg, var(--success) 0%, #38a169 100%);
+            color: white;
+            padding: 25px;
+            border-radius: var(--radius);
             text-align: center;
-            padding: var(--spacing-2xl);
-        }
-        
-        .empty-icon {
-            font-size: 4rem;
-            margin-bottom: var(--spacing-lg);
-            opacity: 0.5;
-        }
-        
-        .empty-title {
-            font-size: var(--font-size-2xl);
+            font-size: 1.3rem;
             font-weight: 700;
-            margin-bottom: var(--spacing-md);
-            color: var(--text-secondary);
+            margin-top: 25px;
+            box-shadow: 0 8px 25px rgba(72, 187, 120, 0.3);
         }
         
-        .empty-subtitle {
-            font-size: var(--font-size-base);
-            color: var(--text-muted);
-            max-width: 400px;
-            line-height: 1.6;
+        /* Fullscreen Solution Modal */
+        .fullscreen-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
         }
         
-        /* Loading State */
-        .loading-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(255, 255, 255, 0.95);
+        .fullscreen-modal.active {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
+            animation: fadeIn 0.3s ease-out;
         }
         
-        .loading-spinner {
-            width: 3rem;
-            height: 3rem;
-            border: 3px solid var(--border);
-            border-top: 3px solid var(--primary);
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .fullscreen-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1001;
+        }
+        
+        .fullscreen-header h3 {
+            font-size: 1.6rem;
+            margin: 0;
+        }
+        
+        .fullscreen-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .close-fullscreen {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+        }
+        
+        .close-fullscreen:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+        
+        .fullscreen-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 40px;
+            background: var(--bg-primary);
+            scroll-behavior: smooth;
+        }
+        
+        .fullscreen-content::-webkit-scrollbar {
+            width: 16px;
+        }
+        
+        .fullscreen-content::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+        
+        .fullscreen-content::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 8px;
+            border: 3px solid var(--bg-secondary);
+        }
+        
+        /* Enhanced Sequence Navigation - Fixed Position */
+        .sequence-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            background: var(--bg-primary);
+            padding: 15px 0;
+            z-index: 5;
+            border-bottom: 2px solid var(--border);
+            width: 100%;
+            box-sizing: border-box;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .sequence-nav::-webkit-scrollbar {
+            height: 6px;
+        }
+        
+        .sequence-nav::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 3px;
+        }
+        
+        .sequence-nav::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
+        }
+        
+        .sequence-btn {
+            padding: 12px 20px;
+            border: 2px solid var(--primary);
+            background: white;
+            color: var(--primary);
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 14px;
+            font-weight: 600;
+            position: relative;
+            overflow: hidden;
+            white-space: nowrap;
+            flex-shrink: 0;
+            min-width: 100px;
+            text-align: center;
+        }
+        
+        .sequence-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transition: left 0.5s;
+        }
+        
+        .sequence-btn:hover::before {
+            left: 100%;
+        }
+        
+        .sequence-btn.active, .sequence-btn:hover {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        /* Chat Area */
+        .chat-area {
+            background: var(--bg-primary);
+            border-radius: var(--radius);
+            padding: 30px;
+            height: 500px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chat-area h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: white;
+            margin-bottom: 20px;
+            scroll-behavior: smooth;
+        }
+        
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+        
+        .message {
+            margin-bottom: 18px;
+            padding: 15px 20px;
+            border-radius: 20px;
+            max-width: 85%;
+            word-wrap: break-word;
+            animation: messageSlideIn 0.4s ease-out;
+            position: relative;
+            overflow-x: auto;
+        }
+        
+        @keyframes messageSlideIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px) scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+            }
+        }
+        
+        .user-message {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 8px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .ai-message {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-bottom-left-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        
+        .ai-message .math-expression, .ai-message .MathJax {
+            background: white;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+            overflow-x: auto;
+        }
+        
+        .chat-input-area {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid var(--border);
+            border-radius: 25px;
+            outline: none;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+            font-family: inherit;
+        }
+        
+        .chat-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .send-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
             border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .send-btn:hover {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .send-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Loading Animation */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 4px solid var(--bg-secondary);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
             animation: spin 1s linear infinite;
-            margin-bottom: var(--spacing-lg);
+            margin: 0 auto 20px;
         }
         
         @keyframes spin {
@@ -891,962 +1028,1536 @@ HTML_TEMPLATE = """
             100% { transform: rotate(360deg); }
         }
         
-        .loading-text {
-            font-size: var(--font-size-lg);
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: var(--spacing-sm);
+        /* Status Messages */
+        .error {
+            background: linear-gradient(135deg, #fed7d7, #feb2b2);
+            color: var(--error-color);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin: 15px 0;
+            border-left: 5px solid var(--error-color);
+            animation: shake 0.5s ease-in-out;
         }
         
-        .loading-subtitle {
-            font-size: var(--font-size-sm);
-            color: var(--text-muted);
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
         
-        /* Progress Bar */
-        .progress-container {
+        .success {
+            background: linear-gradient(135deg, #c6f6d5, #9ae6b4);
+            color: var(--success);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin: 15px 0;
+            border-left: 5px solid var(--success);
+        }
+        
+        /* Scroll to Top Button */
+        .scroll-to-top {
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: rgba(255, 255, 255, 0.3);
-            z-index: 10000;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, var(--accent), var(--primary));
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 55px;
+            height: 55px;
+            cursor: pointer;
+            font-size: 20px;
             opacity: 0;
-            transition: var(--transition);
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
         }
         
-        .progress-container.active {
+        .scroll-to-top.visible {
             opacity: 1;
+            visibility: visible;
         }
         
-        .progress-bar {
-            height: 100%;
-            background: var(--bg-accent);
-            width: 0%;
-            transition: width 0.3s ease;
+        .scroll-to-top:hover {
+            transform: scale(1.1) translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.5);
         }
         
-        /* Notifications */
-        .notification {
+        /* Solution Navigation Dots */
+        .solution-nav-dots {
             position: fixed;
-            top: var(--spacing-lg);
-            right: var(--spacing-lg);
-            padding: var(--spacing-lg);
-            border-radius: var(--radius-lg);
-            color: var(--text-inverse);
-            font-weight: 600;
-            z-index: 10000;
-            transform: translateX(400px);
-            transition: transform 0.3s ease;
-            max-width: 350px;
-            box-shadow: var(--shadow-xl);
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
         }
         
-        .notification.show {
-            transform: translateX(0);
+        .solution-nav-dots.visible {
+            opacity: 1;
+            visibility: visible;
         }
         
-        .notification.success { background: var(--success); }
-        .notification.error { background: var(--error); }
-        .notification.warning { background: var(--warning); }
-        .notification.info { background: var(--info); }
+        .nav-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(102, 126, 234, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-dot:hover, .nav-dot.active {
+            background: var(--primary);
+            transform: scale(1.3);
+        }
+        
+        .nav-dot::after {
+            content: attr(data-step);
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--text-primary);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-dot:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Zoom Controls */
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .zoom-btn {
+            background: transparent !important;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .zoom-level {
+            color: white;
+            font-size: 14px;
+            min-width: 50px;
+            text-align: center;
+        }
         
         /* Responsive Design */
         @media (max-width: 1024px) {
-            .main-container {
+            .main-content {
                 grid-template-columns: 1fr;
-                grid-template-rows: auto 1fr;
+                gap: 25px;
+                padding: 30px;
             }
             
-            .input-section {
-                border-right: none;
-                border-bottom: 1px solid var(--border);
+            .container {
+                padding: 15px;
+            }
+            
+            .solution-nav-dots {
+                display: none;
             }
         }
         
         @media (max-width: 768px) {
-            :root {
-                --header-height: 3.5rem;
-                --container-padding: 1rem;
-            }
-            
             .header {
-                padding: 0 var(--container-padding);
-                flex-wrap: wrap;
-                height: auto;
-                min-height: var(--header-height);
+                padding: 40px 20px;
             }
             
-            .logo-section {
-                order: 1;
-                flex: 1;
+            .header h1 {
+                font-size: 2.2rem;
             }
             
-            .header-controls {
-                order: 2;
-                width: 100%;
-                margin-top: var(--spacing-md);
-                justify-content: space-between;
+            .ny-ai-logo {
+                font-size: 2.5rem;
             }
             
-            .header-stats {
-                display: none;
+            .ny-ai-badge {
+                position: static;
+                display: inline-block;
+                margin-bottom: 20px;
             }
             
-            .subject-options {
-                grid-template-columns: 1fr;
+            .main-content {
+                padding: 20px;
             }
             
-            .tab-header {
+            .input-section, .solution-area, .chat-area {
+                padding: 20px;
+            }
+            
+            .solution-content {
+                padding: 20px;
+            }
+            
+            .tab-buttons {
                 flex-direction: column;
+                gap: 8px;
+            }
+            
+            .sequence-nav {
+                gap: 8px;
+                padding: 10px 0;
+            }
+            
+            .sequence-btn {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+            
+            .chat-area {
+                height: 400px;
             }
             
             .solution-header {
-                padding: var(--spacing-lg) var(--container-padding);
+                padding: 20px;
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
             }
             
-            .solution-title {
-                font-size: var(--font-size-lg);
+            .solution-controls {
+                width: 100%;
+                justify-content: center;
             }
             
-            .solution-actions {
-                flex-wrap: wrap;
+            .fullscreen-content {
+                padding: 20px;
+            }
+            
+            .scroll-to-top {
+                bottom: 20px;
+                right: 20px;
+                width: 50px;
+                height: 50px;
+                font-size: 18px;
             }
         }
         
         @media (max-width: 480px) {
-            .logo-content h1 {
-                font-size: var(--font-size-lg);
+            .container {
+                padding: 10px;
             }
             
-            .section-title {
-                font-size: var(--font-size-lg);
+            .header {
+                padding: 30px 15px;
             }
             
-            .solve-button {
-                padding: var(--spacing-md) var(--spacing-lg);
-                font-size: var(--font-size-base);
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .ny-ai-logo {
+                font-size: 2rem;
+            }
+            
+            .main-content {
+                padding: 15px;
+                gap: 20px;
+            }
+            
+            .message {
+                max-width: 95%;
+                padding: 12px 16px;
+            }
+            
+            .solution-step {
+                padding: 20px;
             }
             
             .step-header {
                 flex-direction: column;
-                align-items: flex-start;
-                gap: var(--spacing-sm);
+                text-align: center;
+                gap: 10px;
             }
             
-            .step-number {
-                align-self: flex-start;
+            .sequence-nav {
+                justify-content: center;
+            }
+            
+            .MathJax_Display {
+                padding: 15px !important;
+                font-size: 14px !important;
             }
         }
         
-        /* Touch-friendly interactions */
-        @media (hover: none) and (pointer: coarse) {
-            .header-btn,
-            .action-button,
-            .solve-button {
-                min-height: 44px;
-            }
-            
-            .file-upload-area {
-                min-height: 120px;
-            }
+        /* Custom scrollbar for webkit browsers */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) var(--bg-secondary);
         }
         
-        /* Reduced motion support */
-        @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-            }
+        *::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
         }
         
-        /* Print styles */
-        @media print {
-            .header,
-            .input-section,
-            .solution-header {
-                display: none;
-            }
-            
-            .main-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .solution-content {
-                padding: 0;
-                overflow: visible;
-            }
-            
-            .solution-step {
-                break-inside: avoid;
-                box-shadow: none;
-                border: 1px solid #ccc;
-                margin-bottom: var(--spacing-lg);
-            }
+        *::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+        
+        *::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+        
+        *::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
         }
     </style>
 </head>
 <body>
-    <div class="progress-container" id="progressContainer">
-        <div class="progress-bar" id="progressBar"></div>
-    </div>
-    
-    <div class="app-wrapper">
-        <header class="header">
-            <div class="logo-section">
-                <div class="logo-icon">🧠</div>
-                <div class="logo-content">
-                    <h1>JEE Solver by Nischay</h1>
-                    <div class="tagline">Advanced AI Problem Solver</div>
-                </div>
+    <div class="container">
+        <div class="main-wrapper">
+            <div class="header">
+                <div class="ny-ai-badge">Powered by NY AI</div>
+                <div class="ny-ai-logo">🧠 NY AI</div>
+                <h1>Advanced JEE Question Solver</h1>
+                <p>Next-Gen AI with OCR, MathJax Rendering & Sequential Solutions</p>
             </div>
-            <div class="header-controls">
-                <div class="header-stats">
-                    <div class="stat-item">
-                        <span>📚</span>
-                        <span>Physics</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>⚗️</span>
-                        <span>Chemistry</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>📐</span>
-                        <span>Mathematics</span>
-                    </div>
-                </div>
-                <div class="header-actions">
-                    <button class="header-btn" onclick="toggleTheme()">🌓</button>
-                    <button class="header-btn" onclick="toggleFullscreen()">⛶</button>
-                    <button class="header-btn" onclick="showHistory()">📊</button>
-                </div>
-            </div>
-        </header>
-        
-        <main class="main-container">
-            <section class="input-section">
-                <div class="section-header">
-                    <h2 class="section-title">
-                        <span>📤</span>
-                        Upload Question
-                    </h2>
-                    <p class="section-subtitle">Select subject and upload your JEE question for detailed solution</p>
-                </div>
-                
-                <div class="input-content">
-                    <!-- Subject Selection -->
-                    <div class="subject-selector">
-                        <h3 class="subject-title">Select Subject</h3>
-                        <div class="subject-options">
-                            <div class="subject-option">
-                                <input type="radio" name="subject" value="physics" id="physics" checked>
-                                <label for="physics" class="subject-label">
-                                    <div class="subject-icon">⚡</div>
-                                    <div class="subject-name">Physics</div>
-                                </label>
-                            </div>
-                            <div class="subject-option">
-                                <input type="radio" name="subject" value="chemistry" id="chemistry">
-                                <label for="chemistry" class="subject-label">
-                                    <div class="subject-icon">🧪</div>
-                                    <div class="subject-name">Chemistry</div>
-                                </label>
-                            </div>
-                            <div class="subject-option">
-                                <input type="radio" name="subject" value="mathematics" id="mathematics">
-                                <label for="mathematics" class="subject-label">
-                                    <div class="subject-icon">📊</div>
-                                    <div class="subject-name">Mathematics</div>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Input Tabs -->
-                    <div class="tab-container">
-                        <div class="tab-header">
-                            <button class="tab-button active" onclick="switchTab('upload')">
-                                🖼️ Image Upload
-                            </button>
-                            <button class="tab-button" onclick="switchTab('url')">
-                                🔗 Image URL
-                            </button>
+            
+            <div class="main-content">
+                <div class="left-panel">
+                    <div class="input-section">
+                        <h3>📤 Input Question</h3>
+                        
+                        <div class="tab-buttons">
+                            <button class="tab-btn active" onclick="switchTab('image')">📷 Image</button>
+                            <button class="tab-btn" onclick="switchTab('url')">🔗 URL</button>
                         </div>
                         
-                        <div class="tab-content active" id="uploadTab">
-                            <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
-                                <input type="file" id="fileInput" class="file-input" accept="image/*" onchange="handleFileUpload(event)">
-                                <div class="upload-icon">📷</div>
-                                <div class="upload-text">Upload JEE Question</div>
-                                <div class="upload-hint">Click here or drag & drop image (JPG, PNG, WebP - Max 10MB)</div>
-                            </div>
-                            
-                            <div class="image-preview" id="imagePreview">
-                                <img class="preview-image" id="previewImage" alt="Question preview">
-                                <div class="preview-footer">
-                                    <div class="preview-info" id="previewInfo"></div>
-                                    <button class="remove-button" onclick="removeImage()">Remove</button>
+                        <form method="POST" enctype="multipart/form-data" id="questionForm">
+                            <div id="image-tab" class="tab-content active">
+                                <div class="file-upload" onclick="document.getElementById('imageFile').click()">
+                                    <div>📁 Click to upload or drag & drop image</div>
+                                    <small>Supports JPG, PNG, GIF, WebP</small>
+                                    <input type="file" id="imageFile" name="image_file" accept="image/*" style="display: none;" onchange="previewImage(this)">
                                 </div>
                             </div>
+                            
+                            <div id="url-tab" class="tab-content">
+                                <input type="url" name="image_url" placeholder="🔗 Paste image URL here..." value="{{ image_url or '' }}">
+                            </div>
+                            
+                            <button type="submit" class="solve-btn" id="solveBtn">
+                                🧠 Analyze & Solve with NY AI
+                            </button>
+                        </form>
+                    </div>
+                    
+                    {% if image_url %}
+                    <div class="input-section">
+                        <h3>🖼️ Input Image</h3>
+                        <img src="{{ image_url }}" class="image-preview" alt="Question Image">
+                    </div>
+                    {% endif %}
+                    
+                    {% if extracted_text %}
+                    <div class="input-section">
+                        <h3>📄 Extracted Text</h3>
+                        <div style="background: white; padding: 20px; border-radius: 12px; border-left: 5px solid var(--accent);">
+                            <pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.6;">{{ extracted_text }}</pre>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="right-panel">
+                    <div class="solution-area">
+                        <div class="solution-header">
+                            <h3>✅ Sequential Solution by NY AI</h3>
+                            <div class="solution-controls">
+                                <div class="zoom-controls">
+                                    <button class="zoom-btn" onclick="adjustZoom(-0.1)" title="Zoom Out">−</button>
+                                    <span class="zoom-level" id="zoomLevel">100%</span>
+                                    <button class="zoom-btn" onclick="adjustZoom(0.1)" title="Zoom In">+</button>
+                                </div>
+                                <button class="fullscreen-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">⛶</button>
+                            </div>
                         </div>
                         
-                        <div class="tab-content" id="urlTab">
-                            <input type="url" class="url-input" id="urlInput" 
-                                   placeholder="https://example.com/jee-question.jpg" 
-                                   onchange="handleUrlInput()">
+                        <div class="solution-content" id="solutionContent">
+                            {% if solution_sequence %}
+                            <div class="sequence-nav" id="sequenceNav">
+                                {% for i in range(solution_sequence|length) %}
+                                <button class="sequence-btn {% if i == 0 %}active{% endif %}" onclick="showStep({{ i }})">
+                                    Step {{ i + 1 }}
+                                </button>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="solution-sequence">
+                                {% for step in solution_sequence %}
+                                <div class="solution-step" id="step-{{ loop.index0 }}" {% if loop.index0 != 0 %}style="display: none;"{% endif %}>
+                                    <div class="step-header">
+                                        <div class="step-number">{{ loop.index }}</div>
+                                        <div class="step-title">{{ step.title }}</div>
+                                    </div>
+                                    <div class="step-content">
+                                        {{ step.content|safe }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="loading" id="loading">
+                                <div class="spinner"></div>
+                                <p>NY AI is analyzing your question...</p>
+                            </div>
+                            
+                            {% if not solution %}
+                            <div style="text-align: center; color: var(--text-light); padding: 60px 20px;">
+                                <div style="font-size: 4rem; margin-bottom: 20px; opacity: 0.7;">🤖</div>
+                                <h3 style="margin-bottom: 10px; color: var(--text-secondary);">Ready to Solve!</h3>
+                                <p>Upload an image or provide a URL to get started with NY AI's advanced problem-solving capabilities.</p>
+                            </div>
+                            {% endif %}
+                            {% endif %}
+                            
+                            {% if error %}
+                            <div class="error">{{ error }}</div>
+                            {% endif %}
                         </div>
                     </div>
                     
-                    <button class="solve-button" id="solveButton" onclick="solveQuestion()" disabled>
-                        🚀 Solve JEE Question
-                    </button>
-                </div>
-            </section>
-            
-            <section class="solution-section">
-                <div class="solution-header">
-                    <h2 class="solution-title">
-                        <span>✅</span>
-                        Detailed Solution
-                    </h2>
-                    <div class="solution-actions">
-                        <button class="action-button" onclick="copySolution()" title="Copy Solution">📋</button>
-                        <button class="action-button" onclick="downloadSolution()" title="Download PDF">💾</button>
-                        <button class="action-button" onclick="shareSolution()" title="Share">📤</button>
-                        <button class="action-button" onclick="printSolution()" title="Print">🖨️</button>
-                    </div>
-                </div>
-                
-                <div class="solution-content" id="solutionContent">
-                    <div class="empty-state">
-                        <div class="empty-icon">🎯</div>
-                        <div class="empty-title">Ready to Solve!</div>
-                        <div class="empty-subtitle">
-                            Upload a JEE question image to get step-by-step solutions with detailed explanations, 
-                            formulas, and conceptual insights by Nischay's AI solver.
+                    <div class="chat-area">
+                        <h3>💬 Chat with NY AI</h3>
+                        <div class="chat-messages" id="chatMessages">
+                            {% for message in chat_history %}
+                            <div class="message {{ 'user-message' if message.role == 'user' else 'ai-message' }}">
+                                {{ message.content|safe }}
+                            </div>
+                            {% endfor %}
+                            
+                            {% if not chat_history %}
+                            <div style="text-align: center; color: var(--text-light); padding: 40px 20px;">
+                                <div style="font-size: 2.5rem; margin-bottom: 15px; opacity: 0.6;">💭</div>
+                                <p>Ask me anything about the solution or related concepts!</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="chat-input-area">
+                            <input type="text" class="chat-input" id="chatInput" placeholder="Ask follow-up questions to NY AI..." onkeypress="handleChatKeyPress(event)">
+                            <button class="send-btn" onclick="sendChatMessage()">➤</button>
                         </div>
                     </div>
                 </div>
-            </section>
-        </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Modal -->
+    <div class="fullscreen-modal" id="fullscreenModal">
+        <div class="fullscreen-header">
+            <h3>✅ Sequential Solution by NY AI - Full Screen</h3>
+            <div class="fullscreen-controls">
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="adjustFullscreenZoom(-0.1)" title="Zoom Out">−</button>
+                    <span class="zoom-level" id="fullscreenZoomLevel">100%</span>
+                    <button class="zoom-btn" onclick="adjustFullscreenZoom(0.1)" title="Zoom In">+</button>
+                </div>
+                <button class="close-fullscreen" onclick="toggleFullscreen()" title="Exit Fullscreen">✕</button>
+            </div>
+        </div>
+        <div class="fullscreen-content" id="fullscreenContent">
+            <!-- Content will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <!-- Scroll to Top Button -->
+    <button class="scroll-to-top" id="scrollToTop" onclick="scrollToTop()" title="Scroll to Top">↑</button>
+
+    <!-- Solution Navigation Dots -->
+    <div class="solution-nav-dots" id="solutionNavDots">
+        <!-- Dots will be dynamically generated -->
     </div>
 
     <script>
-        // Global application state
-        let currentQuestion = null;
-        let currentSolution = null;
-        let isDarkMode = localStorage.getItem('theme') === 'dark';
-        let selectedSubject = 'physics';
+        let currentZoom = 1;
+        let fullscreenZoom = 1;
         
-        // Initialize application
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
-            initializeDragDrop();
-            initializeTheme();
-            trackSubjectSelection();
+        // Enhanced tab switching with animations
+        function switchTab(tabName) {
+            // Hide all tab contents with fade out
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.opacity = '0';
+                tab.style.transform = 'translateY(10px)';
+                setTimeout(() => {
+                    tab.classList.remove('active');
+                }, 150);
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab with fade in
+            setTimeout(() => {
+                const targetTab = document.getElementById(tabName + '-tab');
+                targetTab.classList.add('active');
+                targetTab.style.opacity = '1';
+                targetTab.style.transform = 'translateY(0)';
+                event.target.classList.add('active');
+            }, 150);
+        }
+        
+        // Enhanced step navigation with smooth scrolling
+        function showStep(stepIndex) {
+            // Hide all steps with smooth transition
+            document.querySelectorAll('.solution-step').forEach((step, index) => {
+                step.style.opacity = '0';
+                step.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    step.style.display = 'none';
+                }, 200);
+            });
+            
+            // Remove active from all sequence buttons
+            document.querySelectorAll('.sequence-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected step with animation
+            setTimeout(() => {
+                const targetStep = document.getElementById('step-' + stepIndex);
+                targetStep.style.display = 'block';
+                setTimeout(() => {
+                    targetStep.style.opacity = '1';
+                    targetStep.style.transform = 'translateY(0)';
+                }, 50);
+                
+                event.target.classList.add('active');
+                updateNavDots(stepIndex);
+                
+                // Smooth scroll to step
+                targetStep.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start',
+                    inline: 'nearest'
+                });
+                
+                // Re-render MathJax for the visible step
+                if (window.MathJax) {
+                    MathJax.typesetPromise([targetStep]).then(() => {
+                        adjustMathJaxForMobile();
+                    });
+                }
+            }, 200);
+        }
+        
+        // Fullscreen functionality
+        function toggleFullscreen() {
+            const modal = document.getElementById('fullscreenModal');
+            const isActive = modal.classList.contains('active');
+            
+            if (!isActive) {
+                // Enter fullscreen
+                const solutionContent = document.getElementById('solutionContent');
+                const fullscreenContent = document.getElementById('fullscreenContent');
+                
+                // Clone content to fullscreen modal
+                fullscreenContent.innerHTML = solutionContent.innerHTML;
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                
+                // Re-render MathJax in fullscreen
+                if (window.MathJax) {
+                    MathJax.typesetPromise([fullscreenContent]).then(() => {
+                        adjustMathJaxForMobile();
+                    });
+                }
+            } else {
+                // Exit fullscreen
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+        
+        // Zoom functionality
+        function adjustZoom(delta) {
+            currentZoom = Math.max(0.5, Math.min(2, currentZoom + delta));
+            const content = document.getElementById('solutionContent');
+            content.style.transform = `scale(${currentZoom})`;
+            content.style.transformOrigin = 'top left';
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+            
+            // Re-adjust MathJax after zoom
+            setTimeout(() => adjustMathJaxForMobile(), 100);
+        }
+        
+        function adjustFullscreenZoom(delta) {
+            fullscreenZoom = Math.max(0.5, Math.min(2, fullscreenZoom + delta));
+            const content = document.getElementById('fullscreenContent');
+            content.style.transform = `scale(${fullscreenZoom})`;
+            content.style.transformOrigin = 'top left';
+            document.getElementById('fullscreenZoomLevel').textContent = Math.round(fullscreenZoom * 100) + '%';
+            
+            // Re-adjust MathJax after zoom
+            setTimeout(() => adjustMathJaxForMobile(), 100);
+        }
+        
+        // Scroll to top functionality
+        function scrollToTop() {
+            const solutionContent = document.getElementById('solutionContent');
+            if (solutionContent) {
+                solutionContent.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            } else {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
+        }
+        
+        // Update navigation dots
+        function updateNavDots(activeIndex) {
+            document.querySelectorAll('.nav-dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === activeIndex);
+            });
+        }
+        
+        // Generate navigation dots
+        function generateNavDots() {
+            const steps = document.querySelectorAll('.solution-step');
+            const navDots = document.getElementById('solutionNavDots');
+            
+            if (steps.length > 1) {
+                navDots.innerHTML = '';
+                steps.forEach((step, index) => {
+                    const dot = document.createElement('div');
+                    dot.className = `nav-dot ${index === 0 ? 'active' : ''}`;
+                    dot.setAttribute('data-step', `Step ${index + 1}`);
+                    dot.onclick = () => {
+                        document.querySelector(`.sequence-btn:nth-child(${index + 1})`).click();
+                    };
+                    navDots.appendChild(dot);
+                });
+                navDots.classList.add('visible');
+            }
+        }
+        
+        // Enhanced MathJax handling for mobile
+        function adjustMathJaxForMobile() {
+            document.querySelectorAll('.MathJax, .MathJax_Display').forEach(math => {
+                math.style.overflowX = 'auto';
+                math.style.maxWidth = '100%';
+                math.style.fontSize = window.innerWidth < 768 ? '14px' : '16px';
+                
+                // Add touch scrolling for mobile
+                if ('ontouchstart' in window) {
+                    math.style.webkitOverflowScrolling = 'touch';
+                }
+            });
+        }
+        
+        // Enhanced image preview with animation
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Remove existing preview
+                    const existingPreview = document.getElementById('imagePreview');
+                    if (existingPreview) {
+                        existingPreview.remove();
+                    }
+                    
+                    // Create new preview with animation
+                    const preview = document.createElement('img');
+                    preview.id = 'imagePreview';
+                    preview.className = 'image-preview';
+                    preview.src = e.target.result;
+                    preview.style.opacity = '0';
+                    preview.style.transform = 'scale(0.9)';
+                    
+                    input.parentNode.appendChild(preview);
+                    
+                    // Animate in
+                    setTimeout(() => {
+                        preview.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                        preview.style.opacity = '1';
+                        preview.style.transform = 'scale(1)';
+                    }, 50);
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        // Enhanced drag and drop with better visual feedback
+        const fileUpload = document.querySelector('.file-upload');
+        let dragCounter = 0;
+        
+        fileUpload.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            fileUpload.classList.add('drag-over');
         });
         
-        function initializeApp() {
-            console.log('JEE Solver by Nischay - Initialized');
-            updateSolveButtonState();
-        }
-        
-        function initializeTheme() {
-            if (isDarkMode) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            }
-        }
-        
-        function toggleTheme() {
-            isDarkMode = !isDarkMode;
-            if (isDarkMode) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                document.documentElement.removeAttribute('data-theme');
-                localStorage.setItem('theme', 'light');
-            }
-        }
-        
-        function trackSubjectSelection() {
-            document.querySelectorAll('input[name="subject"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    selectedSubject = this.value;
-                    console.log('Subject selected:', selectedSubject);
-                });
-            });
-        }
-        
-        // Tab management
-        function switchTab(tabName) {
-            // Update buttons
-            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
-            
-            // Update content
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            document.getElementById(tabName + 'Tab').classList.add('active');
-            
-            updateSolveButtonState();
-        }
-        
-        // Drag and drop functionality
-        function initializeDragDrop() {
-            const uploadArea = document.querySelector('.file-upload-area');
-            
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, preventDefaults, false);
-            });
-            
-            ['dragenter', 'dragover'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover'), false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover'), false);
-            });
-            
-            uploadArea.addEventListener('drop', handleFileDrop, false);
-        }
-        
-        function preventDefaults(e) {
+        fileUpload.addEventListener('dragleave', (e) => {
             e.preventDefault();
-            e.stopPropagation();
-        }
+            dragCounter--;
+            if (dragCounter === 0) {
+                fileUpload.classList.remove('drag-over');
+            }
+        });
         
-        function handleFileDrop(e) {
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            fileUpload.classList.remove('drag-over');
+            
             const files = e.dataTransfer.files;
             if (files.length > 0) {
-                handleFileUpload({ target: { files: files } });
-            }
-        }
-        
-        // File handling
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            if (!validateFile(file)) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                displayImagePreview(e.target.result, file);
-                currentQuestion = e.target.result;
-                updateSolveButtonState();
-            };
-            reader.readAsDataURL(file);
-        }
-        
-        function validateFile(file) {
-            const maxSize = 10 * 1024 * 1024; // 10MB
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-            
-            if (!allowedTypes.includes(file.type)) {
-                showNotification('Please upload a valid image file (JPG, PNG, GIF, WebP)', 'error');
-                return false;
-            }
-            
-            if (file.size > maxSize) {
-                showNotification('File size must be less than 10MB', 'error');
-                return false;
-            }
-            
-            return true;
-        }
-        
-        function displayImagePreview(src, file) {
-            const preview = document.getElementById('imagePreview');
-            const img = document.getElementById('previewImage');
-            const info = document.getElementById('previewInfo');
-            
-            img.src = src;
-            info.textContent = `${file.name} (${formatFileSize(file.size)})`;
-            preview.style.display = 'block';
-        }
-        
-        function handleUrlInput() {
-            const url = document.getElementById('urlInput').value.trim();
-            if (url && isValidImageUrl(url)) {
-                currentQuestion = url;
-                updateSolveButtonState();
-            } else {
-                currentQuestion = null;
-                updateSolveButtonState();
-            }
-        }
-        
-        function isValidImageUrl(url) {
-            try {
-                new URL(url);
-                return /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
-            } catch {
-                return false;
-            }
-        }
-        
-        function removeImage() {
-            document.getElementById('imagePreview').style.display = 'none';
-            document.getElementById('fileInput').value = '';
-            currentQuestion = null;
-            updateSolveButtonState();
-        }
-        
-        function updateSolveButtonState() {
-            const solveBtn = document.getElementById('solveButton');
-            const hasInput = currentQuestion !== null;
-            
-            solveBtn.disabled = !hasInput;
-            solveBtn.style.opacity = hasInput ? '1' : '0.6';
-        }
-        
-        // Question solving
-        async function solveQuestion() {
-            if (!currentQuestion) {
-                showNotification('Please upload a question image first', 'error');
-                return;
-            }
-            
-            showProgress();
-            showLoadingState();
-            
-            try {
-                updateProgress(25);
+                const fileInput = document.getElementById('imageFile');
+                fileInput.files = files;
+                previewImage(fileInput);
                 
-                const payload = {
-                    image: currentQuestion,
-                    subject: selectedSubject,
-                    timestamp: new Date().toISOString()
-                };
-                
-                updateProgress(50);
-                
-                const response = await fetch('/solve', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload)
+                // Visual feedback for successful drop
+                fileUpload.style.background = 'rgba(72, 187, 120, 0.1)';
+                fileUpload.style.borderColor = 'var(--success)';
+                setTimeout(() => {
+                    fileUpload.style.background = '';
+                    fileUpload.style.borderColor = '';
+                }, 1000);
+            }
+        });
+        
+        // Enhanced form submission with better loading states
+        document.getElementById('questionForm').addEventListener('submit', function(e) {
+            const solveBtn = document.getElementById('solveBtn');
+            const loading = document.getElementById('loading');
+            
+            // Show loading state
+            if (loading) {
+                loading.style.display = 'block';
+                loading.style.opacity = '0';
+                setTimeout(() => {
+                    loading.style.transition = 'opacity 0.3s ease';
+                    loading.style.opacity = '1';
+                }, 50);
+            }
+            
+            // Disable and animate button
+            solveBtn.disabled = true;
+            solveBtn.innerHTML = '🔄 NY AI Analyzing...';
+            solveBtn.style.transform = 'scale(0.98)';
+            
+            // Add pulsing animation to button
+            solveBtn.style.animation = 'pulse 2s infinite';
+        });
+        
+        // Enhanced chat functionality
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendChatMessage();
+            }
+        }
+        
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message with animation
+            addMessageToChat(message, 'user');
+            input.value = '';
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            // Send to server
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideTypingIndicator();
+                if (data.response) {
+                    addMessageToChat(data.response, 'ai');
+                } else if (data.error) {
+                    addMessageToChat('Error: ' + data.error, 'ai');
+                }
+            })
+            .catch(error => {
+                hideTypingIndicator();
+                addMessageToChat('Error: ' + error.message, 'ai');
+            });
+        }
+        
+        function addMessageToChat(message, role) {
+            const chatMessages = document.getElementById('chatMessages');
+            
+            // Remove empty state if present
+            const emptyState = chatMessages.querySelector('[style*="text-align: center"]');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}-message`;
+            messageDiv.innerHTML = message;
+            messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translateY(20px) scale(0.95)';
+            
+            chatMessages.appendChild(messageDiv);
+            
+            // Animate message in
+            setTimeout(() => {
+                messageDiv.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                messageDiv.style.opacity = '1';
+                messageDiv.style.transform = 'translateY(0) scale(1)';
+            }, 50);
+            
+            // Smooth scroll to bottom
+            setTimeout(() => {
+                chatMessages.scrollTo({
+                    top: chatMessages.scrollHeight,
+                    behavior: 'smooth'
                 });
+            }, 100);
+            
+            // Re-render MathJax for new messages
+            if (window.MathJax) {
+                MathJax.typesetPromise([messageDiv]).then(() => {
+                    adjustMathJaxForMobile();
+                });
+            }
+        }
+        
+        function showTypingIndicator() {
+            const chatMessages = document.getElementById('chatMessages');
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typing-indicator';
+            typingDiv.className = 'message ai-message';
+            typingDiv.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="display: flex; gap: 4px;">
+                        <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: typing 1.4s infinite ease-in-out;"></div>
+                        <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: typing 1.4s infinite ease-in-out 0.2s;"></div>
+                        <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: typing 1.4s infinite ease-in-out 0.4s;"></div>
+                    </div>
+                    <span style="color: var(--text-light); font-size: 0.9rem;">NY AI is thinking...</span>
+                </div>
+            `;
+            
+            // Add typing animation
+            const typingStyle = document.createElement('style');
+            typingStyle.textContent = `
+                @keyframes typing {
+                    0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+                    30% { opacity: 1; transform: scale(1); }
+                }
+            `;
+            document.head.appendChild(typingStyle);
+            
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTo({
+                top: chatMessages.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+        
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.style.opacity = '0';
+                typingIndicator.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    typingIndicator.remove();
+                }, 300);
+            }
+        }
+        
+        // Scroll event handlers
+        function handleScroll() {
+            const scrollToTopBtn = document.getElementById('scrollToTop');
+            const solutionContent = document.getElementById('solutionContent');
+            
+            if (solutionContent) {
+                const scrollTop = solutionContent.scrollTop;
+                const scrollHeight = solutionContent.scrollHeight;
+                const clientHeight = solutionContent.clientHeight;
                 
-                updateProgress(75);
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    displaySolution(result.solution);
-                    currentSolution = result.solution;
-                    showNotification('Question solved successfully! 🎉', 'success');
+                // Show/hide scroll to top button
+                if (scrollTop > 200) {
+                    scrollToTopBtn.classList.add('visible');
                 } else {
-                    throw new Error(result.error || 'Failed to solve question');
+                    scrollToTopBtn.classList.remove('visible');
                 }
                 
-                updateProgress(100);
-                
-            } catch (error) {
-                console.error('Error solving question:', error);
-                showNotification('Failed to solve question. Please try again.', 'error');
-                displayError(error.message);
-            } finally {
-                hideProgress();
-                setTimeout(hideLoadingState, 500);
+                // Update active step based on scroll position
+                updateActiveStepOnScroll();
             }
         }
         
-        function displaySolution(solution) {
-            const content = document.getElementById('solutionContent');
+        function updateActiveStepOnScroll() {
+            const steps = document.querySelectorAll('.solution-step:not([style*="display: none"])');
+            const solutionContent = document.getElementById('solutionContent');
             
-            if (!solution || !solution.steps || solution.steps.length === 0) {
-                displayError('No solution steps received');
-                return;
-            }
+            if (steps.length === 0 || !solutionContent) return;
             
-            let html = '<div class="solution-steps">';
+            const scrollTop = solutionContent.scrollTop;
+            const containerTop = solutionContent.offsetTop;
             
-            solution.steps.forEach((step, index) => {
-                html += `
-                    <div class="solution-step">
-                        <div class="step-header">
-                            <div class="step-number">${index + 1}</div>
-                            <div class="step-title">${escapeHtml(step.title || `Step ${index + 1}`)}</div>
-                        </div>
-                        <div class="step-content">${processStepContent(step.content || step.text || '')}</div>
-                    </div>
-                `;
+            let activeStepIndex = 0;
+            
+            steps.forEach((step, index) => {
+                const stepTop = step.offsetTop - containerTop;
+                if (scrollTop >= stepTop - 100) {
+                    activeStepIndex = index;
+                }
             });
             
-            html += '</div>';
-            content.innerHTML = html;
+            // Update navigation dots
+            updateNavDots(activeStepIndex);
+        }
+        
+        // Initialize everything when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up initial tab transitions
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            });
             
-            // Process MathJax
-            if (window.MathJax) {
-                MathJax.typesetPromise([content]).then(() => {
-                    optimizeMathDisplay();
-                });
+            // Set up solution steps transitions
+            document.querySelectorAll('.solution-step').forEach(step => {
+                step.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            });
+            
+            // Add scroll event listener
+            const solutionContent = document.getElementById('solutionContent');
+            if (solutionContent) {
+                solutionContent.addEventListener('scroll', handleScroll);
             }
-        }
-        
-        function processStepContent(content) {
-            // Convert line breaks
-            content = content.replace(/\n/g, '<br>');
             
-            // Process markdown
-            content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
-            
-            // Process LaTeX
-            content = content.replace(/\$\$([\s\S]*?)\$\$/g, '$$$$1$$');
-            content = content.replace(/\$([^$\n]+)\$/g, '$$$$1$$');
-            
-            return content;
-        }
-        
-        function displayError(message) {
-            const content = document.getElementById('solutionContent');
-            content.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">❌</div>
-                    <div class="empty-title">Error</div>
-                    <div class="empty-subtitle">${escapeHtml(message)}</div>
-                </div>
-            `;
-        }
-        
-        // UI States
-        function showLoadingState() {
-            const content = document.getElementById('solutionContent');
-            content.innerHTML = `
-                <div class="loading-overlay">
-                    <div class="loading-spinner"></div>
-                    <div class="loading-text">Solving JEE Question...</div>
-                    <div class="loading-subtitle">AI is analyzing and generating step-by-step solution</div>
-                </div>
-            `;
-        }
-        
-        function hideLoadingState() {
-            const overlay = document.querySelector('.loading-overlay');
-            if (overlay) {
-                overlay.style.opacity = '0';
-                setTimeout(() => overlay.remove(), 300);
-            }
-        }
-        
-        function showProgress() {
-            document.getElementById('progressContainer').classList.add('active');
-        }
-        
-        function updateProgress(percent) {
-            document.getElementById('progressBar').style.width = percent + '%';
-        }
-        
-        function hideProgress() {
+            // Generate navigation dots if steps exist
             setTimeout(() => {
-                document.getElementById('progressContainer').classList.remove('active');
-                document.getElementById('progressBar').style.width = '0%';
+                generateNavDots();
             }, 500);
-        }
-        
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
-            document.body.appendChild(notification);
             
-            setTimeout(() => notification.classList.add('show'), 100);
-            
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                    }
-                }, 300);
-            }, 3000);
-        }
-        
-        // Feature functions
-        function copySolution() {
-            if (!currentSolution) {
-                showNotification('No solution to copy', 'warning');
-                return;
-            }
-            
-            let text = `JEE Question Solution by Nischay\n${'='.repeat(50)}\n\n`;
-            text += `Subject: ${selectedSubject.toUpperCase()}\n\n`;
-            
-            currentSolution.steps.forEach((step, index) => {
-                text += `${index + 1}. ${step.title || `Step ${index + 1}`}\n`;
-                text += `${step.content || step.text || ''}\n\n`;
-            });
-            
-            navigator.clipboard.writeText(text).then(() => {
-                showNotification('Solution copied to clipboard! 📋', 'success');
-            }).catch(() => {
-                showNotification('Failed to copy solution', 'error');
-            });
-        }
-        
-        function downloadSolution() {
-            if (!currentSolution) {
-                showNotification('No solution to download', 'warning');
-                return;
-            }
-            
-            let content = `JEE Question Solution by Nischay\n`;
-            content += `${'='.repeat(50)}\n\n`;
-            content += `Subject: ${selectedSubject.toUpperCase()}\n`;
-            content += `Date: ${new Date().toLocaleDateString()}\n\n`;
-            
-            currentSolution.steps.forEach((step, index) => {
-                content += `${index + 1}. ${step.title || `Step ${index + 1}`}\n`;
-                content += `${step.content || step.text || ''}\n\n`;
-            });
-            
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `jee-solution-${selectedSubject}-${new Date().toISOString().slice(0, 10)}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
-            
-            showNotification('Solution downloaded! 💾', 'success');
-        }
-        
-        function shareSolution() {
-            if (!currentSolution) {
-                showNotification('No solution to share', 'warning');
-                return;
-            }
-            
-            if (navigator.share) {
-                navigator.share({
-                    title: 'JEE Solution by Nischay',
-                    text: 'Check out this detailed JEE solution!',
-                    url: window.location.href
-                }).catch(() => fallbackShare());
-            } else {
-                fallbackShare();
-            }
-        }
-        
-        function fallbackShare() {
-            navigator.clipboard.writeText(window.location.href).then(() => {
-                showNotification('Link copied to clipboard! 📤', 'success');
-            }).catch(() => {
-                showNotification('Sharing not supported', 'error');
-            });
-        }
-        
-        function printSolution() {
-            if (!currentSolution) {
-                showNotification('No solution to print', 'warning');
-                return;
-            }
-            window.print();
-        }
-        
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(() => {
-                    showNotification('Fullscreen not supported', 'error');
+            // Initialize MathJax with proper configuration for mobile
+            if (window.MathJax) {
+                MathJax.typesetPromise().then(() => {
+                    adjustMathJaxForMobile();
                 });
-            } else {
-                document.exitFullscreen();
+                
+                // Configure MathJax for dynamic content
+                MathJax.config.tex.inlineMath = [['$', '$'], ['\\(', '\\)']];
+                MathJax.config.tex.displayMath = [['$$', '$$'], ['\\[', '\\]']];
+            }
+            
+            // Add smooth scrolling to all internal links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+            
+            // Handle window resize for responsive adjustments
+            window.addEventListener('resize', () => {
+                adjustMathJaxForMobile();
+                
+                // Hide navigation dots on mobile
+                const navDots = document.getElementById('solutionNavDots');
+                if (window.innerWidth <= 1024) {
+                    navDots.classList.remove('visible');
+                } else if (document.querySelectorAll('.solution-step').length > 1) {
+                    navDots.classList.add('visible');
+                }
+            });
+        });
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl/Cmd + Enter to submit form
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                const form = document.getElementById('questionForm');
+                if (form) {
+                    form.dispatchEvent(new Event('submit'));
+                }
+            }
+            
+            // Escape to exit fullscreen or clear chat input
+            if (e.key === 'Escape') {
+                const fullscreenModal = document.getElementById('fullscreenModal');
+                if (fullscreenModal.classList.contains('active')) {
+                    toggleFullscreen();
+                } else {
+                    const chatInput = document.getElementById('chatInput');
+                    if (chatInput && document.activeElement === chatInput) {
+                        chatInput.value = '';
+                        chatInput.blur();
+                    }
+                }
+            }
+            
+            // F11 or F for fullscreen toggle
+            if (e.key === 'F11' || (e.key === 'f' && !e.ctrlKey && !e.metaKey)) {
+                e.preventDefault();
+                toggleFullscreen();
+            }
+            
+            // Arrow keys for step navigation
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                const activeBtn = document.querySelector('.sequence-btn.active');
+                if (activeBtn) {
+                    const buttons = Array.from(document.querySelectorAll('.sequence-btn'));
+                    const currentIndex = buttons.indexOf(activeBtn);
+                    let newIndex;
+                    
+                    if (e.key === 'ArrowLeft') {
+                        newIndex = Math.max(0, currentIndex - 1);
+                    } else {
+                        newIndex = Math.min(buttons.length - 1, currentIndex + 1);
+                    }
+                    
+                    if (newIndex !== currentIndex) {
+                        buttons[newIndex].click();
+                    }
+                }
+            }
+        });
+        
+        // Performance optimization: Lazy load images
+        if ('IntersectionObserver' in window) {
+            const imageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                            observer.unobserve(img);
+                        }
+                    }
+                });
+            });
+            
+            document.querySelectorAll('img[data-src]').forEach(img => {
+                imageObserver.observe(img);
+            });
+        }
+        
+        // Add pulse animation for loading button
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Touch gestures for mobile
+        if ('ontouchstart' in window) {
+            let touchStartX = 0;
+            let touchStartY = 0;
+            
+            document.addEventListener('touchstart', function(e) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            });
+            
+            document.addEventListener('touchend', function(e) {
+                if (!touchStartX || !touchStartY) return;
+                
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                
+                const diffX = touchStartX - touchEndX;
+                const diffY = touchStartY - touchEndY;
+                
+                // Only process horizontal swipes that are longer than vertical
+                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                    const activeBtn = document.querySelector('.sequence-btn.active');
+                    if (activeBtn) {
+                        const buttons = Array.from(document.querySelectorAll('.sequence-btn'));
+                        const currentIndex = buttons.indexOf(activeBtn);
+                        let newIndex;
+                        
+                        if (diffX > 0) { // Swipe left - next step
+                            newIndex = Math.min(buttons.length - 1, currentIndex + 1);
+                        } else { // Swipe right - previous step
+                            newIndex = Math.max(0, currentIndex - 1);
+                        }
+                        
+                        if (newIndex !== currentIndex) {
+                            buttons[newIndex].click();
+                        }
+                    }
+                }
+                
+                touchStartX = 0;
+                touchStartY = 0;
+            });
+        }
+        
+        // Auto-save zoom preferences
+        function saveZoomPreference() {
+            localStorage.setItem('jee-solver-zoom', currentZoom);
+            localStorage.setItem('jee-solver-fullscreen-zoom', fullscreenZoom);
+        }
+        
+        function loadZoomPreference() {
+            const savedZoom = localStorage.getItem('jee-solver-zoom');
+            const savedFullscreenZoom = localStorage.getItem('jee-solver-fullscreen-zoom');
+            
+            if (savedZoom) {
+                currentZoom = parseFloat(savedZoom);
+                const content = document.getElementById('solutionContent');
+                if (content) {
+                    content.style.transform = `scale(${currentZoom})`;
+                    content.style.transformOrigin = 'top left';
+                    document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+                }
+            }
+            
+            if (savedFullscreenZoom) {
+                fullscreenZoom = parseFloat(savedFullscreenZoom);
+                document.getElementById('fullscreenZoomLevel').textContent = Math.round(fullscreenZoom * 100) + '%';
             }
         }
         
-        function showHistory() {
-            showNotification('Solution history feature coming soon! 📊', 'info');
-        }
+        // Override zoom functions to save preferences
+        const originalAdjustZoom = adjustZoom;
+        const originalAdjustFullscreenZoom = adjustFullscreenZoom;
         
-        // Utility functions
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
+        adjustZoom = function(delta) {
+            originalAdjustZoom(delta);
+            saveZoomPreference();
+        };
         
-        function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
+        adjustFullscreenZoom = function(delta) {
+            originalAdjustFullscreenZoom(delta);
+            saveZoomPreference();
+        };
+        
+        // Load preferences on page load
+        setTimeout(loadZoomPreference, 100);
+        
+        // Accessibility improvements
+        document.addEventListener('keydown', function(e) {
+            // Add focus management for keyboard navigation
+            if (e.key === 'Tab') {
+                // Ensure focus is visible
+                document.documentElement.classList.add('keyboard-nav');
+            }
+        });
+        
+        document.addEventListener('mousedown', function() {
+            document.documentElement.classList.remove('keyboard-nav');
+        });
+        
+        // Add CSS for keyboard navigation
+        const accessibilityStyle = document.createElement('style');
+        accessibilityStyle.textContent = `
+            .keyboard-nav *:focus {
+                outline: 2px solid var(--primary) !important;
+                outline-offset: 2px !important;
+            }
+        `;
+        document.head.appendChild(accessibilityStyle);
     </script>
 </body>
 </html>
 """
 
-@app.route('/')
-def index():
-    return render_template_string(HTML_TEMPLATE)
+def encode_image_to_base64(image_data):
+    """Convert image data to base64 string."""
+    if isinstance(image_data, bytes):
+        return base64.b64encode(image_data).decode('utf-8')
+    return image_data
 
-@app.route('/solve', methods=['POST'])
-def solve_question():
-    try:
-        data = request.get_json()
-        image_data = data.get('image')
-        subject = data.get('subject', 'general')
-        
-        if not image_data:
-            return jsonify({'success': False, 'error': 'No image provided'})
-        
-        logger.info(f"Processing {subject} question")
-        
-        # Simulate OCR and solution generation
-        extracted_text = extract_question_text(image_data)
-        solution = generate_jee_solution(extracted_text, subject)
-        
-        # Store in database
-        solution_id = str(uuid.uuid4())
-        with sqlite3.connect(DATABASE_NAME) as conn:
-            conn.execute('''
-                INSERT INTO solutions (id, question_text, solution_steps, subject, difficulty, timestamp, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (solution_id, extracted_text, json.dumps(solution), subject, 'medium', 
-                  datetime.datetime.now(), session.get('user_id', 'anonymous')))
-            conn.commit()
-        
-        return jsonify({
-            'success': True,
-            'solution': solution,
-            'solution_id': solution_id,
-            'extracted_text': extracted_text,
-            'subject': subject
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in solve_question: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'An error occurred while processing your question'
-        })
-
-def extract_question_text(image_data):
-    """Extract text from image using OCR (mock implementation)"""
-    # In production, use Google Vision API or Tesseract
-    sample_questions = {
-        'physics': "A particle of mass 2 kg is moving with velocity 10 m/s. Find the kinetic energy.",
-        'chemistry': "Balance the equation: H2 + O2 → H2O",
-        'mathematics': "Solve the integral: ∫(x² + 2x + 1)dx"
-    }
-    return sample_questions.get('physics', "Sample JEE question detected")
-
-def generate_jee_solution(question_text, subject):
-    """Generate detailed JEE solution steps"""
+def call_gemini_vision(prompt, image_data=None, image_url=None):
+    """Enhanced Gemini API call with vision capabilities."""
     
-    solutions = {
-        'physics': {
-            'steps': [
-                {
-                    'title': 'Given Information',
-                    'content': f'**Question:** {question_text}\n\n**Given:**\n• Mass (m) = 2 kg\n• Velocity (v) = 10 m/s\n\n**To Find:** Kinetic Energy (K.E.)'
-                },
-                {
-                    'title': 'Formula Application',
-                    'content': 'The kinetic energy of a particle is given by:\n\n$$KE = \\frac{1}{2}mv^2$$\n\nWhere:\n• m = mass of the particle\n• v = velocity of the particle'
-                },
-                {
-                    'title': 'Substitution',
-                    'content': 'Substituting the given values:\n\n$$KE = \\frac{1}{2} \\times 2 \\times (10)^2$$\n\n$$KE = \\frac{1}{2} \\times 2 \\times 100$$'
-                },
-                {
-                    'title': 'Calculation',
-                    'content': '$$KE = \\frac{1}{2} \\times 2 \\times 100 = 1 \\times 100 = 100 \\text{ J}$$\n\nTherefore, the kinetic energy of the particle is **100 Joules**.'
-                },
-                {
-                    'title': 'Verification & Concept',
-                    'content': '**Verification:** Units check out correctly (kg⋅m²⋅s⁻² = J) ✓\n\n**Key Concept:** Kinetic energy represents the energy possessed by a body due to its motion. It depends on both mass and the square of velocity, making velocity the more significant factor.'
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY
+    }
+    
+    parts = [{"text": prompt}]
+    
+    # Add image data if provided
+    if image_data:
+        try:
+            # Handle both base64 string and bytes
+            if isinstance(image_data, bytes):
+                image_b64 = base64.b64encode(image_data).decode('utf-8')
+            else:
+                image_b64 = image_data
+                
+            parts.append({
+                "inline_data": {
+                    "mime_type": "image/jpeg",
+                    "data": image_b64
                 }
-            ]
-        },
-        'chemistry': {
-            'steps': [
-                {
-                    'title': 'Unbalanced Equation',
-                    'content': f'**Question:** {question_text}\n\n**Unbalanced equation:**\n$$\\ce{H2 + O2 -> H2O}$$'
-                },
-                {
-                    'title': 'Atom Count Analysis',
-                    'content': '**Reactants:**\n• H atoms: 2\n• O atoms: 2\n\n**Products:**\n• H atoms: 2\n• O atoms: 1\n\n**Issue:** Oxygen atoms are not balanced (2 ≠ 1)'
-                },
-                {
-                    'title': 'Balancing Steps',
-                    'content': 'To balance oxygen atoms, we need 2 water molecules:\n\n$$\\ce{H2 + O2 -> 2H2O}$$\n\nNow checking:\n• H atoms: Left = 2, Right = 4 (unbalanced)\n• O atoms: Left = 2, Right = 2 (balanced)'
-                },
-                {
-                    'title': 'Final Balancing',
-                    'content': 'To balance hydrogen atoms, we need 2 H₂ molecules:\n\n$$\\ce{2H2 + O2 -> 2H2O}$$\n\n**Final check:**\n• H atoms: Left = 4, Right = 4 ✓\n• O atoms: Left = 2, Right = 2 ✓'
-                },
-                {
-                    'title': 'Balanced Equation',
-                    'content': '**Balanced chemical equation:**\n\n$$\\ce{2H2 + O2 -> 2H2O}$$\n\nThis represents the combustion of hydrogen gas to form water vapor.'
-                }
-            ]
-        },
-        'mathematics': {
-            'steps': [
-                {
-                    'title': 'Given Integral',
-                    'content': f'**Problem:** {question_text}\n\n$$\\int (x^2 + 2x + 1) dx$$\n\nWe need to find the antiderivative of this polynomial function.'
-                },
-                {
-                    'title': 'Power Rule Application',
-                    'content': 'Using the power rule for integration:\n\n$$\\int x^n dx = \\frac{x^{n+1}}{n+1} + C$$\n\nWe integrate each term separately:\n\n$$\\int (x^2 + 2x + 1) dx = \\int x^2 dx + \\int 2x dx + \\int 1 dx$$'
-                },
-                {
-                    'title': 'Term-by-term Integration',
-                    'content': '**First term:** $\\int x^2 dx = \\frac{x^3}{3}$\n\n**Second term:** $\\int 2x dx = 2 \\cdot \\frac{x^2}{2} = x^2$\n\n**Third term:** $\\int 1 dx = x$'
-                },
-                {
-                    'title': 'Combining Results',
-                    'content': '$$\\int (x^2 + 2x + 1) dx = \\frac{x^3}{3} + x^2 + x + C$$\n\nWhere C is the constant of integration.'
-                },
-                {
-                    'title': 'Alternative Recognition',
-                    'content': '**Note:** The integrand can be factored:\n\n$$x^2 + 2x + 1 = (x+1)^2$$\n\nSo alternatively:\n$$\\int (x+1)^2 dx = \\frac{(x+1)^3}{3} + C = \\frac{x^3 + 3x^2 + 3x + 1}{3} + C$$\n\nBoth methods give the same result!'
-                }
-            ]
+            })
+        except Exception as e:
+            return f"Error processing image: {str(e)}"
+    
+    elif image_url and not image_url.startswith('data:'):
+        # For external URLs, download and encode
+        try:
+            response = requests.get(image_url, timeout=10)
+            if response.status_code == 200:
+                image_b64 = base64.b64encode(response.content).decode('utf-8')
+                parts.append({
+                    "inline_data": {
+                        "mime_type": "image/jpeg",
+                        "data": image_b64
+                    }
+                })
+        except Exception as e:
+            return f"Error downloading image: {str(e)}"
+    
+    payload = {
+        "contents": [{
+            "parts": parts
+        }],
+        "generationConfig": {
+            "temperature": 0.2,
+            "topK": 40,
+            "topP": 0.95,
+            "maxOutputTokens": 8192,
         }
     }
     
-    return solutions.get(subject, solutions['physics'])
-
-@app.route('/history')
-def get_history():
     try:
-        with sqlite3.connect(DATABASE_NAME) as conn:
-            cursor = conn.execute('''
-                SELECT id, question_text, subject, difficulty, timestamp 
-                FROM solutions 
-                ORDER BY timestamp DESC 
-                LIMIT 50
-            ''')
-            history = []
-            for row in cursor.fetchall():
-                history.append({
-                    'id': row[0],
-                    'question_text': row[1][:100] + '...' if len(row[1]) > 100 else row[1],
-                    'subject': row[2],
-                    'difficulty': row[3],
-                    'timestamp': row[4]
+        response = requests.post(GEMINI_VISION_URL, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        
+        result = response.json()
+        
+        if "candidates" in result and len(result["candidates"]) > 0:
+            content = result["candidates"][0].get("content", {})
+            parts = content.get("parts", [])
+            if parts:
+                return parts[0].get("text", "No response generated.")
+        
+        return "No valid response from Gemini API."
+        
+    except requests.exceptions.RequestException as e:
+        return f"API request failed: {str(e)}"
+    except json.JSONDecodeError as e:
+        return f"Failed to parse API response: {str(e)}"
+    except Exception as e:
+        return f"Unexpected error: {str(e)}"
+
+def create_sequential_prompt(question_text=None, has_image=False):
+    """Create an enhanced prompt for sequential JEE question analysis."""
+    
+    base_prompt = """You are NY AI, an expert JEE (Joint Entrance Examination) tutor with deep knowledge in Physics, Chemistry, and Mathematics. 
+
+TASK: Analyze and solve the provided JEE question with a structured, sequential approach.
+
+IMPORTANT: Format all mathematical expressions using LaTeX notation for MathJax rendering. Use $ for inline math and $$ for display math.
+
+RESPONSE FORMAT - Provide exactly 6 structured sections:
+
+**SECTION 1: QUESTION ANALYSIS**
+- Subject area and topic identification
+- Difficulty level assessment
+- Key concepts overview
+
+**SECTION 2: TEXT & CONTENT EXTRACTION**
+- Extract all text, equations, and visual elements
+- Describe any diagrams or graphs
+- List multiple choice options if present
+
+**SECTION 3: CONCEPT IDENTIFICATION**
+- List relevant formulas (use LaTeX: $F = ma$, $E = mc^2$, etc.)
+- Identify key principles and laws
+- Required mathematical tools
+
+**SECTION 4: SOLUTION STRATEGY**
+- Outline the solution approach
+- Identify the sequence of steps needed
+- Choose the most efficient method
+
+**SECTION 5: DETAILED CALCULATION**
+- Step-by-step mathematical solution
+- Show all work with proper LaTeX formatting
+- Include intermediate results and explanations
+
+**SECTION 6: FINAL ANSWER & VERIFICATION**
+- Clear final answer with units
+- Verification of the result
+- Common mistakes to avoid
+
+Each section should be clearly separated and use proper LaTeX formatting for all mathematical expressions."""
+    
+    if question_text:
+        base_prompt += f"\n\nQUESTION TEXT:\n{question_text}"
+    
+    if has_image:
+        base_prompt += "\n\nIMAGE: Please analyze the provided image carefully for any additional visual information, diagrams, graphs, or mathematical expressions."
+    
+    return base_prompt
+
+def parse_solution_into_sequence(solution_text):
+    """Parse the solution into sequential steps for better display."""
+    if not solution_text:
+        return []
+    
+    # Split by sections
+    sections = []
+    current_section = ""
+    current_title = ""
+    
+    lines = solution_text.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        
+        # Check if line is a section header
+        if line.startswith('**SECTION') and line.endswith('**'):
+            # Save previous section
+            if current_title and current_section:
+                sections.append({
+                    'title': current_title,
+                    'content': current_section.strip()
                 })
             
-        return jsonify({'success': True, 'history': history})
+            # Start new section
+            current_title = line.replace('**SECTION', '').replace('**', '').strip()
+            if ':' in current_title:
+                current_title = current_title.split(':', 1)[1].strip()
+            current_section = ""
+        
+        elif line.startswith('**') and line.endswith('**') and current_section:
+            # Sub-header within section
+            current_section += f"<h4 style='color: #ff6b6b; margin: 15px 0 10px 0;'>{line.replace('**', '')}</h4>\n"
+        
+        else:
+            # Regular content
+            if line:
+                current_section += line + "\n"
+    
+    # Add the last section
+    if current_title and current_section:
+        sections.append({
+            'title': current_title,
+            'content': current_section.strip()
+        })
+    
+    # If no sections found, create a single section
+    if not sections and solution_text:
+        sections.append({
+            'title': 'Complete Solution',
+            'content': solution_text
+        })
+    
+    return sections
+
+@app.route('/', methods=['GET', 'POST'])
+def home():
+    # Initialize session variables
+    if 'chat_history' not in session:
+        session['chat_history'] = []
+    
+    image_url = None
+    solution_sequence = None
+    error = None
+    extracted_text = None
+    
+    if request.method == 'POST':
+        try:
+            # Get inputs
+            image_url = request.form.get('image_url', '').strip()
+            
+            image_data = None
+            has_image = False
+            
+            # Handle file upload
+            if 'image_file' in request.files and request.files['image_file'].filename:
+                file = request.files['image_file']
+                if file and file.filename != '':
+                    try:
+                        # Validate file type
+                        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+                        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+                        
+                        if file_ext not in allowed_extensions:
+                            error = "Please upload a valid image file (PNG, JPG, JPEG, GIF, WebP)."
+                        else:
+                            image_data = file.read()
+                            # Create data URL for display
+                            image_b64 = base64.b64encode(image_data).decode('utf-8')
+                            image_url = f"data:image/{file_ext};base64,{image_b64}"
+                            has_image = True
+                    except Exception as e:
+                        error = f"Error processing uploaded file: {str(e)}"
+            
+            # Handle URL input
+            elif image_url:
+                if image_url.startswith('data:'):
+                    # Data URL - extract base64 data
+                    try:
+                        header, data = image_url.split(',', 1)
+                        image_data = base64.b64decode(data)
+                        has_image = True
+                    except Exception as e:
+                        error = f"Error processing data URL: {str(e)}"
+                else:
+                    # External URL
+                    has_image = True
+            
+            # Validate input
+            if not has_image:
+                error = "Please provide an image (upload or URL)."
+            
+            elif not error:
+                # Create enhanced prompt for sequential solution
+                prompt = create_sequential_prompt(None, has_image)
+                
+                # Call Gemini API
+                solution = call_gemini_vision(prompt, image_data, image_url)
+                
+                # Parse solution into sequence
+                solution_sequence = parse_solution_into_sequence(solution)
+                
+                # Extract text for display purposes
+                extract_prompt = """Please extract ALL text content from this image, including:
+                - Question text
+                - Mathematical equations and expressions (format with LaTeX when possible)
+                - Numbers, measurements, and units
+                - Any labels or annotations
+                - Multiple choice options if present
+                
+                Format the extracted text clearly and preserve the original structure. Use LaTeX notation for mathematical expressions."""
+                
+                extracted_text = call_gemini_vision(extract_prompt, image_data, image_url)
+                
+                # Store context in session for chat
+                session['current_context'] = {
+                    'extracted_text': extracted_text,
+                    'solution_sequence': solution_sequence,
+                    'has_image': has_image
+                }
+                
+        except Exception as e:
+            error = f"An unexpected error occurred: {str(e)}"
+    
+    return render_template_string(HTML_TEMPLATE,
+                                image_url=image_url,
+                                solution_sequence=solution_sequence,
+                                error=error,
+                                extracted_text=extracted_text,
+                                chat_history=session.get('chat_history', []))
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '').strip()
+        
+        if not user_message:
+            return jsonify({'error': 'Empty message'}), 400
+        
+        # Get current context
+        context = session.get('current_context', {})
+        
+        # Build context-aware prompt
+        chat_prompt = f"""You are NY AI, continuing a conversation about a JEE question. Here's the context:
+
+EXTRACTED TEXT: {context.get('extracted_text', 'N/A')}
+
+USER'S FOLLOW-UP QUESTION: {user_message}
+
+Please provide a helpful, detailed response. Use LaTeX notation for mathematical expressions ($ for inline, $$ for display math). 
+If the user is asking for clarification, provide more detailed explanations. If asking about related concepts, explain those as well.
+Always maintain the NY AI persona - be confident, helpful, and educational."""
+        
+        # Get AI response
+        ai_response = call_gemini_vision(chat_prompt)
+        
+        # Add to chat history
+        if 'chat_history' not in session:
+            session['chat_history'] = []
+        
+        session['chat_history'].append({
+            'role': 'user',
+            'content': user_message
+        })
+        
+        session['chat_history'].append({
+            'role': 'ai',
+            'content': ai_response
+        })
+        
+        # Keep only last 20 messages to prevent session overflow
+        if len(session['chat_history']) > 20:
+            session['chat_history'] = session['chat_history'][-20:]
+        
+        session.modified = True
+        
+        return jsonify({'response': ai_response})
+        
     except Exception as e:
-        logger.error(f"Error fetching history: {str(e)}")
-        return jsonify({'success': False, 'error': 'Failed to fetch history'})
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/clear_chat', methods=['POST'])
+def clear_chat():
+    session['chat_history'] = []
+    session.modified = True
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

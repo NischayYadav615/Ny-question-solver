@@ -13,7 +13,7 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)  # For session management
 
 # API Configuration
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or "AIzaSyAHwDXsTEwtcXFlSHgBhTHzugthtNdaVio"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or "AIzaSyBFtF083ys01BrWtXcr4Y3hVpFvAt2Y08E"
 GEMINI_VISION_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
 
 HTML_TEMPLATE = """
